@@ -19,7 +19,7 @@ seed:
 	PYTHONPATH=backend python3 backend/seed_pilot.py
 
 dev-backend:
-	PYTHONPATH=backend uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	PYTHONPATH=backend uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 dev-api: dev-backend
 
@@ -36,7 +36,7 @@ test-api: test-backend
 test: test-backend
 
 lint:
-	PYTHONPATH=backend mypy backend/app || true
+	PYTHONPATH=backend mypy backend/app
 
 build:
 	cd frontend && npm run build

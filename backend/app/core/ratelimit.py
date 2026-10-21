@@ -41,16 +41,19 @@ class InMemoryRateLimiter:
     """
 
     def __init__(self, max_keys: int = 100_000) -> None:
-        self._counters: OrderedDict[str, tuple[int, float]] = OrderedDict()
+        self._counters: OrderedDict[str, tuple[float, int]] = OrderedDict()
         self._max_keys = max_keys
 
     def hit(self, key: str, limit: int, window_seconds: int = 60) -> RateLimitResult:
         if limit <= 0:
             return RateLimitResult(True, 0, 0, 0, 0)
         now = time.monotonic()
-        window_start, count = self._counters.get(key, (now, 0))
-        if now - window_start >= window_seconds:
-            window_start, count = now, 0
+        prev = self._counters.get(key)
+        if prev is None or (now - prev[0] >= window_seconds):
+            window_start = now
+            count = 0
+        else:
+            window_start, count = prev
         count += 1
         self._counters[key] = (window_start, count)
         self._counters.move_to_end(key)

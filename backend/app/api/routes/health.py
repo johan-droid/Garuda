@@ -34,6 +34,7 @@ def health() -> dict[str, Any]:
         "note": HEALTH_NOTE,
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
+        "pilot_region": settings.PILOT_REGION,
         "database": {"ok": database_ok},
         "cache": cache,
         "timestamp": datetime.now(UTC).isoformat(),

@@ -70,15 +70,11 @@ def list_observations(
     if field_name:
         conditions.append(ObservationModel.field_name == field_name)
     if period_start is not None:
-        conditions.append(
-            ObservationModel.reference_period_end.is_not(None),
-            ObservationModel.reference_period_end >= period_start,
-        )
+        conditions.append(ObservationModel.reference_period_end.is_not(None))
+        conditions.append(ObservationModel.reference_period_end >= period_start)
     if period_end is not None:
-        conditions.append(
-            ObservationModel.reference_period_start.is_not(None),
-            ObservationModel.reference_period_start <= period_end,
-        )
+        conditions.append(ObservationModel.reference_period_start.is_not(None))
+        conditions.append(ObservationModel.reference_period_start <= period_end)
 
     total = len(list(session.scalars(select(ObservationModel.id).where(*conditions))))
     rows = list(
@@ -95,13 +91,13 @@ def list_observations(
     observations: list[Any] = []
     for row in rows:
         if row.domain == DOMAIN_HEALTH:
-            view = to_health_observation(row, now)
-            view.quality_status = determine_status(view, now)
-            observations.append(view)
+            health_view = to_health_observation(row, now)
+            health_view.quality_status = determine_status(health_view, now)
+            observations.append(health_view)
         else:
-            view = to_observation(row)
-            view.quality_status = determine_status(view, now)
-            observations.append(view)
+            obs_view = to_observation(row)
+            obs_view.quality_status = determine_status(obs_view, now)
+            observations.append(obs_view)
 
     if not include_stale:
         observations = [

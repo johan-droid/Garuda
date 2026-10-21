@@ -6,6 +6,7 @@ period* of the data (when it describes a period) or its publication/retrieval
 time, and never from the ingestion time alone.
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
@@ -117,12 +118,13 @@ def _domain_for_observation(observation: Observation) -> str:
         return "environment"
     if field.startswith(("disaster_", "flood_", "cyclone_", "seismic_")):
         return "resilience"
+    return "demographics"
 
 
 def summarize_domain(
     domain: str,
-    observations: list[Observation],
-    sources: list[SourceSummary],
+    observations: Sequence[Observation],
+    sources: Sequence[SourceSummary],
     now: datetime | None = None,
 ) -> DataStatusSummary:
     """Build the freshness/provenance summary for a single domain panel."""

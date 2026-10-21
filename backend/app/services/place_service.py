@@ -7,7 +7,7 @@ state plainly when results are incomplete.
 """
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Sequence
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -23,7 +23,10 @@ from app.domain.common import (
     DOMAIN_SERVICES,
     DOMAIN_WEATHER_DISASTERS,
     DataStatus,
+    GeographyLevel,
     HealthCategory,
+    PlaceType,
+    VerificationStatus,
 )
 from app.domain.contracts import (
     AdminHierarchy,
@@ -162,7 +165,7 @@ def _to_place(row: PlaceModel, aliases: list[str] | None = None) -> Place:
         id=row.id,
         canonical_name=row.canonical_name,
         aliases=aliases or [],
-        place_type=row.place_type,
+        place_type=PlaceType(row.place_type),
         parent_id=row.parent_id,
         coordinates=coordinates,
         resolution_method=row.resolution_method,
@@ -219,7 +222,10 @@ def build_hierarchy(session: Session, place: PlaceModel) -> AdminHierarchy:
                 pass
         if current.parent_id is None:
             break
-        current = session.get(PlaceModel, current.parent_id)
+        parent = session.get(PlaceModel, current.parent_id)
+        if parent is None:
+            break
+        current = parent
     return hierarchy
 
 
@@ -238,7 +244,7 @@ def to_observation(row: ObservationModel) -> Observation:
         reference_period_end=row.reference_period_end,
         published_at=row.published_at,
         retrieved_at=row.retrieved_at,
-        quality_status=row.quality_status,
+        quality_status=DataStatus(row.quality_status),
         licence=row.licence,
         notes=row.notes,
     )
@@ -264,14 +270,14 @@ def to_health_observation(row: ObservationModel, now: datetime) -> HealthObserva
         reference_period_end=row.reference_period_end,
         published_at=row.published_at,
         retrieved_at=row.retrieved_at,
-        quality_status=row.quality_status,
+        quality_status=DataStatus(row.quality_status),
         licence=row.licence,
         notes=row.notes,
-        health_category=row.health_category or HealthCategory.ROUTINE_SURVEILLANCE,
+        health_category=HealthCategory(row.health_category) if row.health_category else HealthCategory.ROUTINE_SURVEILLANCE,
         issuing_authority=row.issuing_authority,
         valid_from=row.valid_from,
         valid_until=row.valid_until,
-        affected_geography_level=row.affected_geography_level,
+        affected_geography_level=GeographyLevel(row.affected_geography_level) if row.affected_geography_level else None,
         severity=row.severity,
         disease_code=row.disease_code,
         prevention_link=row.prevention_link,
@@ -291,7 +297,7 @@ def to_source_summary(row: SourceModel, reference_period: str | None = None) -> 
         licence=row.licence,
         reference_period=reference_period,
         retrieved_at=row.updated_at,
-        verification_status=row.verification_status,
+        verification_status=VerificationStatus(row.verification_status),
     )
 
 
@@ -348,6 +354,7 @@ def _build_panel(session: Session, place_id: str, domain: str) -> PanelResponse:
 
     # Health rows need the richer read model: the category, issuer, validity
     # window and expiry are what make a health statement interpretable.
+    observations: Sequence[Observation]
     if domain == DOMAIN_HEALTH:
         now = datetime.now(UTC)
         observations = [to_health_observation(row, now) for row in rows]

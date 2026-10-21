@@ -1,7 +1,7 @@
 """Place, source, and observation contract models (Pydantic v2)."""
 
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, field_validator
 
@@ -176,7 +176,7 @@ class PanelResponse(BaseModel):
     # expiry) in the JSON payload. A plain `list[Observation]` would silently
     # drop them, which would strip exactly the context a reader needs to
     # judge a health alert.
-    observations: list[SerializeAsAny[Observation]] = Field(default_factory=list)
+    observations: Sequence[SerializeAsAny[Observation]] = Field(default_factory=list)
     sources: list[SourceSummary] = Field(default_factory=list)
     last_updated: datetime | None = None
     coverage_note: str | None = None

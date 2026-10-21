@@ -57,15 +57,11 @@ def list_observations(
     if domain:
         conditions.append(ObservationModel.domain == domain)
     if period_start is not None:
-        conditions.append(
-            ObservationModel.reference_period_end.is_not(None),
-            ObservationModel.reference_period_end >= period_start,
-        )
+        conditions.append(ObservationModel.reference_period_end.is_not(None))
+        conditions.append(ObservationModel.reference_period_end >= period_start)
     if period_end is not None:
-        conditions.append(
-            ObservationModel.reference_period_start.is_not(None),
-            ObservationModel.reference_period_start <= period_end,
-        )
+        conditions.append(ObservationModel.reference_period_start.is_not(None))
+        conditions.append(ObservationModel.reference_period_start <= period_end)
 
     total = len(list(session.scalars(select(ObservationModel.id).where(*conditions))))
 

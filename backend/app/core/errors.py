@@ -62,7 +62,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         detail = exc.detail
         # Preserve explicit, operator-authored messages (e.g. rate limit guidance).
-        message = detail if isinstance(detail, str) else None
+        message: str | None = detail if isinstance(detail, str) else None
         if exc.status_code >= 500:
             logger.error(
                 "http_error",

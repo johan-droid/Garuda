@@ -12,7 +12,7 @@ Security notes:
 from functools import lru_cache
 from typing import Any, List, Optional
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Sentinel used to detect "not configured". Deliberately not a usable secret.
@@ -30,19 +30,41 @@ class Settings(BaseSettings):
     # Application Info
     APP_NAME: str = "Garuda Area Intelligence"
     APP_VERSION: str = "1.0.0"
-    ENVIRONMENT: str = Field(default="development", description="development, staging, production, or testing")
-    DEBUG: bool = Field(default=False, description="Debug mode must remain False in production")
+    PILOT_REGION: str = Field(
+        default="IN-OD",
+        validation_alias=AliasChoices("PILOT_REGION", "GARUDA_PILOT_REGION"),
+        description="Default pilot region code",
+    )
+    ENVIRONMENT: str = Field(
+        default="development",
+        validation_alias=AliasChoices("ENVIRONMENT", "GARUDA_ENV"),
+        description="development, staging, production, or testing",
+    )
+    DEBUG: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("DEBUG", "GARUDA_DEBUG"),
+        description="Debug mode must remain False in production",
+    )
 
     # API Configuration
     API_V1_STR: str = "/api/v1"
 
     # Secrets. No defaults on purpose.
-    SECRET_KEY: str = Field(default=_UNSET, description="Signing/session secret. Required outside development.")
-    ADMIN_API_KEY: str = Field(default=_UNSET, description="Key for privileged administrative operations.")
+    SECRET_KEY: str = Field(
+        default=_UNSET,
+        validation_alias=AliasChoices("SECRET_KEY", "GARUDA_SECRET_KEY"),
+        description="Signing/session secret. Required outside development.",
+    )
+    ADMIN_API_KEY: str = Field(
+        default=_UNSET,
+        validation_alias=AliasChoices("ADMIN_API_KEY", "GARUDA_ADMIN_API_KEY"),
+        description="Key for privileged administrative operations.",
+    )
 
     # Database
     DATABASE_URL: str = Field(
         default="sqlite:///./garuda_local.db",
+        validation_alias=AliasChoices("DATABASE_URL", "GARUDA_DATABASE_URL"),
         description="Database connection URL. SQLite for zero-cost dev/testing, PostgreSQL for production",
     )
     DB_POOL_SIZE: int = Field(default=5, description="Connection pool size")
@@ -53,7 +75,14 @@ class Settings(BaseSettings):
 
     # CORS & Security
     ALLOWED_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:3000", "http://127.0.0.1:8000"],
+        default=[
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:8000",
+        ],
         description="Allowed CORS origins. Set explicitly in production.",
     )
     ALLOWED_ORIGINS_REGEX: Optional[str] = Field(

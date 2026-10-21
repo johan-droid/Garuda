@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.domain.common import AccessMode, VerificationStatus
 from app.domain.contracts import Source
 from app.models.entities import ObservationModel, SourceModel
 
@@ -64,8 +65,8 @@ def _to_source(row: SourceModel) -> Source:
         name=row.name,
         url=row.url,
         licence=row.licence,
-        access_mode=row.access_mode,
-        verification_status=row.verification_status,
+        access_mode=AccessMode(row.access_mode),
+        verification_status=VerificationStatus(row.verification_status),
         last_success=row.last_success,
     )
 
