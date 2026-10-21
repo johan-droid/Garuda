@@ -1,97 +1,110 @@
 # ---------------------------------------------------------------------------
-# Garuda — India Place Intelligence Platform
+# Garuda — Production Git Ignore Policy
+# Strictly permits only production code, fixtures, and documentation.
 # ---------------------------------------------------------------------------
 
-# --- Python ----------------------------------------------------------------
+# --- Python & Bytecode -----------------------------------------------------
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+bin/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+pip-wheel-metadata/
+backend/dist/
+backend/build/
+backend/*.egg-info/
 
-# Virtual environments
+# --- Virtual Environments --------------------------------------------------
 .venv/
 .venv
 backend/.venv
+frontend/.venv
 venv/
 env/
 ENV/
 .python-version
 
-# Packaging / build artefacts
-build/
-dist/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
-
-# --- Test & type-check caches ----------------------------------------------
+# --- Testing, Coverage & Typecheck Caches ----------------------------------
 .pytest_cache/
+backend/.pytest_cache/
 .mypy_cache/
+backend/.mypy_cache/
 .ruff_cache/
+backend/.ruff_cache/
 .pytype/
 .hypothesis/
 .coverage
 .coverage.*
 coverage.xml
+coverage/
+backend/coverage/
+frontend/coverage/
 htmlcov/
 .tox/
 .nox/
 
-# --- Environment & secrets --------------------------------------------------
-# Real configuration must never be committed. Templates are kept.
-.env
-.env.*
-!.env.example
-!.env.*.example
-*.pem
-*.key
-*.p12
-*.pfx
-secrets.json
-credentials.json
-
-# --- Local databases --------------------------------------------------------
-# SQLite files used for local development and tests.
-*.db
-*.db-journal
-*.sqlite
-*.sqlite3
-*.db-wal
-*.db-shm
-backend/garuda_local.db
-
-# --- Node / frontend --------------------------------------------------------
+# --- TypeScript & Node Build Artifacts -------------------------------------
 node_modules/
+frontend/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .pnpm-store/
-
-# Build output
 frontend/dist/
 frontend/build/
 frontend/.next/
 frontend/out/
 frontend/.turbo/
 frontend/.vite/
-apps/web/dist/
-apps/web/build/
 .vite/
 .cache/
 storybook-static/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
 
-# Test output
-coverage/
-frontend/coverage/
+# --- Environment & Sensitive Credentials -----------------------------------
+# Real configuration must NEVER be committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+credentials.json
+*.token
 
-# --- Logs -------------------------------------------------------------------
+# --- Local Databases & Transient Stores ------------------------------------
+# Databases are seeded dynamically via `make seed` or seed_pilot.py
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+garuda_local.db
+backend/garuda_local.db
+
+# --- Logs & Process Output -------------------------------------------------
 *.log
 logs/
 npm-debug.log
 pip-log.txt
 
-# --- Editor & OS ------------------------------------------------------------
+# --- Editor, IDE & Operating System Artifacts ------------------------------
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
@@ -100,12 +113,16 @@ pip-log.txt
 *.swo
 *~
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 Thumbs.db
 desktop.ini
 
-# --- Temporary / scratch files ---------------------------------------------
+# --- Temporary, Scratch & Swap Files ---------------------------------------
 *.tmp
 *.bak
 *.orig
 *.rej
-services/api/_imptest.py
+scratch/
