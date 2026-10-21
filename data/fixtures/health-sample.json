@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "source_id": "src-mohfw",
+    "publisher": "Ministry of Health & Family Welfare, Govt. of India",
+    "retrieved_at": "2026-10-21T00:00:00Z",
+    "licence": "GODL-India"
+  },
+  "records": [
+    {
+      "place_id": "IN-OD-29",
+      "domain": "health",
+      "field_name": "primary_health_centres",
+      "value": 34,
+      "unit": "facilities",
+      "quality_status": "current",
+      "issuing_authority": "National Health Mission Odisha"
+    },
+    {
+      "place_id": "IN-OD-29",
+      "domain": "health",
+      "field_name": "community_health_centres",
+      "value": 10,
+      "unit": "facilities",
+      "quality_status": "current",
+      "issuing_authority": "National Health Mission Odisha"
+    }
+  ]
+}

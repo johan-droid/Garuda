@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "source_id": "src-census-2011",
+    "publisher": "Office of the Registrar General, India",
+    "retrieved_at": "2026-10-21T00:00:00Z",
+    "licence": "GODL-India"
+  },
+  "records": [
+    {
+      "place_id": "IN-OD",
+      "name": "Odisha",
+      "total_population": 41974218,
+      "male_population": 21212136,
+      "female_population": 20762082,
+      "literacy_rate": 72.87,
+      "sex_ratio": 979,
+      "vintage": 2011
+    },
+    {
+      "place_id": "IN-OD-29",
+      "name": "Khordha",
+      "total_population": 2251673,
+      "male_population": 1167114,
+      "female_population": 1084559,
+      "literacy_rate": 86.88,
+      "sex_ratio": 929,
+      "vintage": 2011
+    }
+  ]
+}
