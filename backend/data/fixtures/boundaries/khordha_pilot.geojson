@@ -1,0 +1,276 @@
+{
+  "type": "FeatureCollection",
+  "name": "khordha_pilot_boundaries",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "IN-OD",
+      "properties": {
+        "id": "IN-OD",
+        "canonical_name": "Odisha",
+        "place_type": "state",
+        "parent_id": null,
+        "latitude": 20.9517,
+        "longitude": 85.0985
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [81.40, 18.00],
+            [81.80, 17.80],
+            [82.50, 18.20],
+            [84.00, 19.00],
+            [85.00, 19.50],
+            [86.00, 19.80],
+            [86.90, 20.80],
+            [87.50, 21.60],
+            [87.20, 22.30],
+            [86.20, 22.60],
+            [85.00, 22.20],
+            [83.80, 21.80],
+            [82.60, 21.50],
+            [82.40, 20.50],
+            [81.80, 19.50],
+            [81.40, 18.00]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-29",
+      "properties": {
+        "id": "IN-OD-29",
+        "canonical_name": "Khordha",
+        "place_type": "district",
+        "parent_id": "IN-OD",
+        "latitude": 20.1800,
+        "longitude": 85.6150
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.00, 19.70],
+            [85.02, 19.88],
+            [85.16, 20.08],
+            [85.16, 20.30],
+            [85.36, 20.30],
+            [85.52, 20.30],
+            [85.66, 20.40],
+            [85.96, 20.40],
+            [85.96, 20.20],
+            [85.80, 20.08],
+            [85.52, 19.84],
+            [85.36, 19.66],
+            [85.16, 19.64],
+            [85.00, 19.70]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-BBSR",
+      "properties": {
+        "id": "IN-OD-BBSR",
+        "canonical_name": "Bhubaneswar",
+        "place_type": "subdistrict",
+        "parent_id": "IN-OD-29",
+        "latitude": 20.2961,
+        "longitude": 85.8245
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.66, 20.22],
+            [85.66, 20.38],
+            [85.94, 20.38],
+            [85.94, 20.22],
+            [85.78, 20.22],
+            [85.66, 20.22]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-JAT",
+      "properties": {
+        "id": "IN-OD-JAT",
+        "canonical_name": "Jatni",
+        "place_type": "subdistrict",
+        "parent_id": "IN-OD-29",
+        "latitude": 20.1633,
+        "longitude": 85.7067
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.66, 20.10],
+            [85.66, 20.22],
+            [85.78, 20.22],
+            [85.78, 20.10],
+            [85.66, 20.10]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-KHD",
+      "properties": {
+        "id": "IN-OD-KHD",
+        "canonical_name": "Khordha Town",
+        "place_type": "subdistrict",
+        "parent_id": "IN-OD-29",
+        "latitude": 20.1800,
+        "longitude": 85.6150
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.52, 20.10],
+            [85.52, 20.26],
+            [85.66, 20.26],
+            [85.66, 20.10],
+            [85.52, 20.10]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-BEG",
+      "properties": {
+        "id": "IN-OD-BEG",
+        "canonical_name": "Begunia",
+        "place_type": "subdistrict",
+        "parent_id": "IN-OD-29",
+        "latitude": 20.2100,
+        "longitude": 85.4600
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.36, 20.08],
+            [85.36, 20.28],
+            [85.52, 20.28],
+            [85.52, 20.08],
+            [85.36, 20.08]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-BOL",
+      "properties": {
+        "id": "IN-OD-BOL",
+        "canonical_name": "Bolagarh",
+        "place_type": "subdistrict",
+        "parent_id": "IN-OD-29",
+        "latitude": 20.1800,
+        "longitude": 85.2800
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.16, 20.08],
+            [85.16, 20.28],
+            [85.36, 20.28],
+            [85.36, 20.08],
+            [85.16, 20.08]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-TAN",
+      "properties": {
+        "id": "IN-OD-TAN",
+        "canonical_name": "Tangi",
+        "place_type": "subdistrict",
+        "parent_id": "IN-OD-29",
+        "latitude": 19.9200,
+        "longitude": 85.4000
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.18, 19.86],
+            [85.18, 20.08],
+            [85.50, 20.08],
+            [85.50, 19.86],
+            [85.34, 19.86],
+            [85.18, 19.86]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-CHI",
+      "properties": {
+        "id": "IN-OD-CHI",
+        "canonical_name": "Chilika",
+        "place_type": "subdistrict",
+        "parent_id": "IN-OD-29",
+        "latitude": 19.7800,
+        "longitude": 85.2500
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.18, 19.68],
+            [85.18, 19.86],
+            [85.34, 19.86],
+            [85.34, 19.74],
+            [85.26, 19.68],
+            [85.18, 19.68]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "IN-OD-BAN",
+      "properties": {
+        "id": "IN-OD-BAN",
+        "canonical_name": "Banapur",
+        "place_type": "subdistrict",
+        "parent_id": "IN-OD-29",
+        "latitude": 19.7800,
+        "longitude": 85.1000
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [85.02, 19.70],
+            [85.02, 19.86],
+            [85.18, 19.86],
+            [85.18, 19.70],
+            [85.10, 19.65],
+            [85.02, 19.70]
+          ]
+        ]
+      }
+    }
+  ]
+}

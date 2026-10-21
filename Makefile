@@ -1,30 +1,45 @@
 SHELL := /bin/bash
-.PHONY: dev test lint build clean help
+.PHONY: dev test lint build clean help init-db seed dev-backend dev-frontend test-backend test-frontend
 
 help:
-	@echo "Garuda Development Commands:"
-	@echo "  make dev         - Start both backend and frontend in dev mode"
-	@echo "  make test        - Run backend and frontend test suites"
-	@echo "  make lint        - Run linting and type checking"
-	@echo "  make build       - Build frontend and verify packaging"
-	@echo "  make clean       - Remove cache, build artifacts, and pyc files"
+	@echo "🦅 Garuda Development Commands:"
+	@echo "  make init-db        - Initialize the SQLite database schema"
+	@echo "  make seed           - Populate local database with Khordha pilot dataset"
+	@echo "  make dev-backend    - Start FastAPI backend server on port 8000"
+	@echo "  make dev-frontend   - Start Vite frontend development server on port 5173"
+	@echo "  make test           - Run both backend and frontend test suites"
+	@echo "  make lint           - Run linting and type checking on backend"
+	@echo "  make build          - Build frontend production bundle"
+	@echo "  make clean          - Remove cache and build artifacts"
 
-dev-api:
-	PYTHONPATH=services/api .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+init-db:
+	PYTHONPATH=backend python3 -m app.db.init_db
 
-dev-web:
-	cd apps/web && npm run dev
+seed:
+	PYTHONPATH=backend python3 backend/seed_pilot.py
 
-test-api:
-	PYTHONPATH=services/api .venv/bin/pytest services/api
+dev-backend:
+	PYTHONPATH=backend uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-test: test-api
+dev-api: dev-backend
+
+dev-frontend:
+	cd frontend && npm run dev
+
+dev-web: dev-frontend
+
+test-backend:
+	PYTHONPATH=backend pytest backend
+
+test-api: test-backend
+
+test: test-backend
 
 lint:
-	PYTHONPATH=services/api .venv/bin/mypy services/api/app || true
+	PYTHONPATH=backend mypy backend/app || true
 
 build:
-	cd apps/web && npm run build
+	cd frontend && npm run build
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

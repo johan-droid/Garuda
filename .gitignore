@@ -10,6 +10,8 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv
+backend/.venv
 venv/
 env/
 ENV/
@@ -56,7 +58,7 @@ credentials.json
 *.sqlite3
 *.db-wal
 *.db-shm
-services/api/garuda_local.db
+backend/garuda_local.db
 
 # --- Node / frontend --------------------------------------------------------
 node_modules/
@@ -67,19 +69,21 @@ pnpm-debug.log*
 .pnpm-store/
 
 # Build output
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/.vite/
 apps/web/dist/
 apps/web/build/
-apps/web/.next/
-apps/web/out/
-apps/web/.turbo/
-apps/web/.vite/
 .vite/
 .cache/
 storybook-static/
 
 # Test output
 coverage/
-apps/web/coverage/
+frontend/coverage/
 
 # --- Logs -------------------------------------------------------------------
 *.log
