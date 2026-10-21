@@ -1,202 +1,457 @@
-<div align="center">
+# Garuda — India Place Intelligence Platform
 
-# 🦅 GARUDA
-### India Place Intelligence Platform
-**An open-source-first, zero-planned-spend explorer for India's administrative geography, public health, population, infrastructure, and environmental intelligence.**
+> **An open-source-first, zero-planned-spend explorer for India's administrative geography, public health, population, infrastructure, and environmental intelligence.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENCE)
-[![Python: 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![React: 18](https://img.shields.io/badge/React-18.3-61DAFB.svg?logo=react&logoColor=black)](https://react.dev)
-[![TypeScript: 5.6](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg?logo=typescript&logoColor=white)](https://typescriptlang.org)
-[![MapLibre GL JS](https://img.shields.io/badge/MapLibre-4.7-blueviolet.svg?logo=maplibre&logoColor=white)](https://maplibre.org)
-[![Tests: 52 Passed](https://img.shields.io/badge/Tests-52%20Passed-success.svg)](https://pytest.org)
-[![Pilot: Khordha, Odisha](https://img.shields.io/badge/Pilot%20Region-Khordha%2C%20Odisha%20(IN--OD--29)-orange.svg)](./docs/PILOT_VERIFICATION_REPORT.md)
-[![Status: Production Ready](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](./docs/PRODUCTION.md)
-
-</div>
+Garuda provides deterministic, source-grounded place intelligence across India's administrative levels. From state down to village and coordinate level, users can search, inspect, and analyze multi-domain metrics without hallucinated defaults or unverified extrapolations.
 
 ---
 
-## 🤖 1. Autonomous Multi-Agent Engineering Architecture
+## Table of Contents
 
-Project Garuda was developed, tested, and validated using an **Autonomous Multi-Agent System**. Rather than relying on monolithic generation, execution was partitioned across specialized subagents operating under isolated execution contexts, strict domain boundaries, and deterministic quality gates.
+- [Overview](#overview)
+- [Key Features](#key-features)
+- [Multi-Agent Engineering Architecture](#multi-agent-engineering-architecture)
+- [System Architecture](#system-architecture)
+- [Repository Structure](#repository-structure)
+- [Prerequisites & Environment](#prerequisites--environment)
+- [Installation & Setup](#installation--setup)
+- [Quick Start](#quick-start)
+- [Configuration Reference](#configuration-reference)
+- [API Reference & Usage Examples](#api-reference--usage-examples)
+- [Pilot Territory: Khordha District, Odisha](#pilot-territory-khordha-district-odisha)
+- [Data Governance & Anti-Hallucination Principles](#data-governance--anti-hallucination-principles)
+- [Testing & Quality Verification](#testing--quality-verification)
+- [Security & Responsible Use](#security--responsible-use)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License & Attributions](#license--attributions)
+- [Documentation Index](#documentation-index)
+
+---
+
+## Overview
+
+### The Problem
+Public data across India is fragmented across disparate bulletins, census abstracts, institutional websites, and PDF reports. When exploring remote or local districts, users and analysts often encounter:
+- Outdated metrics presented as live figures without disclosure.
+- Missing village-level data replaced by silent zero defaults or arbitrary interpolations.
+- Misleading boundaries and unverified epidemiological claims.
+- Commercial lock-in via paid mapping and geocoding APIs.
+
+### The Solution
+Garuda is designed around a strict anti-hallucination contract:
+- **Every metric traces to a published source:** Publisher, license, reference period, and retrieval timestamp are recorded.
+- **Missing data is explicitly labeled:** When data is unavailable, Garuda returns `status: "unavailable"` with documented data gaps, never a silent zero.
+- **Historical data remains historical:** 2011 Census metrics are stamped `Historical (2011)`.
+- **Zero-planned-spend:** Operates locally on SQLite (WAL mode), MapLibre GL JS with CARTO/OSM raster basemaps, and verified open public data fixtures.
+- **Non-clinical public health data:** Official advisories and routine disease surveillance are strictly separated, accompanied by mandatory medical disclaimers.
+
+---
+
+## Key Features
+
+- **Interactive Vector & Raster Mapping:** MapLibre GL JS integration rendering administrative boundaries with custom fill, line hierarchy, and dynamic place selection glows.
+- **Point-in-Polygon Reverse Geocoding:** Click any coordinate on the map to resolve the enclosing administrative hierarchy (State → District → Subdistrict/Block/Town) using native ray-casting, with haversine nearest-centroid fallback.
+- **Place Search & Name Disambiguation:** Fast substring search supporting official canonical names, search text, and historical aliases (e.g. searching *"Orissa"* resolves to *"Odisha"*; *"Khurda"* resolves to *"Khordha"`).
+- **Multi-Domain Place Profiles:** Independent panel assembly across 7 domains: Demographics, Public Health, Health Surveillance/Alerts, Services & Education, History & Culture, Environment & Satellite, and Weather & Hazards.
+- **Official Health Advisories:** Dedicated banner rendering active health alerts with issuing authority, validity window, severity, and direct links to authoritative WHO/MoHFW prevention guidance.
+- **Provenance & Evidence Drawer:** Modal view displaying complete attribution metadata (publisher, dataset URL, license, verification status, and retrieval date).
+- **Offline Resilience & Bookmarks:** PWA shell with `localStorage` place bookmarking, per-source cache TTLs, and one-click Markdown report exports.
+- **Operational Source Diagnostics:** Endpoint and modal dashboard reporting real-time adapter health, observation counts, cache ages, and refresh cycles.
+
+---
+
+## Multi-Agent Engineering Architecture
+
+Project Garuda was developed and validated using a specialized **Autonomous Multi-Agent System**. Each subagent operates within explicit domain boundaries, isolated workspaces, and deterministic quality gates:
 
 ```mermaid
 flowchart TD
-    Orchestrator["Parent Orchestrator Agent<br/>Architecture & Master Specification"]
+    Orchestrator["Parent Orchestrator Agent<br/>System Architecture & Interface Contracts"]
 
-    subgraph AutonomousSubagents ["Specialized Subagent Swarm"]
-        SubA["Subagent A: Data Ingestion Specialist<br/><code>dafdccc4</code>"]
-        SubB["Subagent B: Frontend & PWA Specialist<br/><code>bada3443</code>"]
-        SubC["Subagent C: Safety & Quality Auditor<br/><code>Deterministic Rule Engine</code>"]
+    subgraph SubagentSwarm ["Autonomous Subagent Swarm"]
+        SubA["Subagent A: Data Ingestion Specialist<br/>(Boundary Polygons, Seeding, Spatial Resolver)"]
+        SubB["Subagent B: Frontend & PWA Specialist<br/>(MapLibre Layers, UI Panels, Provenance Drawer)"]
+        SubC["Subagent C: Safety & Quality Auditor<br/>(Anti-Hallucination Audits, 52 Regression Tests)"]
     end
 
-    Orchestrator -->|Deploys with Domain Constraints| SubA
-    Orchestrator -->|Deploys with UI/UX Contracts| SubB
+    Orchestrator -->|Delegates Boundary & DB Specs| SubA
+    Orchestrator -->|Delegates UX & State Contracts| SubB
     Orchestrator -->|Enforces 10 Non-Negotiable Gates| SubC
 
-    SubA -->|Boundary Polygons, Seeder, Spatial Reverse Geocoder| Backend["backend/<br/>(FastAPI, GeoJSON, SQLite)"]
-    SubB -->|MapLibre Layers, Multi-Domain Panels, Offline Cache| Frontend["frontend/<br/>(React 18, Vite PWA)"]
-    SubC -->|52 Contract Tests, Freshness Logic, Gap Audit| Verification["Automated CI Verification<br/>(100% Test Pass Gate)"]
+    SubA -->|GeoJSON Fixtures & SQLite Schema| Backend["backend/<br/>(FastAPI, SQLite, Seeders)"]
+    SubB -->|MapLibre Engine & React PWA| Frontend["frontend/<br/>(React 18, Vite PWA)"]
+    SubC -->|Automated Verification Suite| TestGate["CI & Quality Gates<br/>(Pytest & Typecheck: 100% Pass)"]
 
     Backend <--> Frontend
 ```
 
-### Specialized Subagent Specifications
+### Subagent Responsibilities & Deliverables
 
-| Subagent | Role & Agent ID | Focus Area | Technical Deliverables |
-|:---|:---|:---|:---|
-| **Subagent A** | **Data Ingestion Specialist**<br/>`dafdccc4` | Geospatial boundaries, relational schema, data seeding, reverse geocoding | • `backend/data/fixtures/boundaries/khordha_pilot.geojson`<br/>• `backend/app/services/boundary_service.py` (Ray-casting point-in-polygon)<br/>• `backend/seed_pilot.py` (103 observations across 7 domains)<br/>• `/api/v1/places/boundaries` & `/reverse` endpoints<br/>• `backend/app/services/source_service.py` (Diagnostics & TTL) |
-| **Subagent B** | **Frontend & PWA Specialist**<br/>`bada3443` | MapLibre rendering, responsive PWA, dynamic panels, medical disclaimers | • `frontend/src/components/MapView.tsx` (Vector boundaries + highlight glow)<br/>• `frontend/src/pages/HomePage.tsx` (Dynamic panel engine)<br/>• Official health alert banners with validity dates & WHO guidance link<br/>• Provenance drawer, offline detection, and Markdown report export |
-| **Subagent C** | **Safety & Quality Auditor** | Anti-hallucination compliance, contract testing, security review | • `backend/tests/test_pilot_data.py` (24 test cases, 52 total)<br/>• `docs/PILOT_VERIFICATION_REPORT.md` (Formal 10-principle audit)<br/>• Explicit data-gap states (`status: "unavailable"`, no zero defaults) |
-
----
-
-## 🎯 2. Product Experience & Capabilities
-
-Garuda delivers deep, source-grounded place intelligence across India's administrative levels:
-
-- 🗺️ **Interactive Geographic Map:** MapLibre GL JS vector rendering with multi-tier administrative boundaries (State, District, Block/Tehsil, Town) and CARTO/OSM raster basemaps.
-- 📍 **Click-to-Identify Spatial Resolution:** Click anywhere on the map to reverse-geocode coordinates via a high-precision ray-casting algorithm to resolve the enclosing administrative hierarchy.
-- 🔍 **Place Search & Name Disambiguation:** Fast name matching supporting historical aliases (e.g., searching *"Orissa"* resolves to *"Odisha"*; *"Khurda"* resolves to *"Khordha"`).
-- 🛡️ **Official Public Health Advisories:** Prominent, dated health alert banners specifying the issuing authority, validity period, severity, and links to authoritative WHO/MoHFW prevention advice.
-- 📋 **Auditable Provenance Engine:** Inspect any metric to view its citable source, publisher, license, collection date, and quality classification.
-- 💾 **Local-First & Offline Resilience:** Saves bookmarked places to `localStorage`, caches responses with per-source TTLs, and allows one-click export of structured Markdown reports.
+| Agent Role | Primary Focus | Delivered Code & Artifacts |
+|:---|:---|:---|
+| **Data Ingestion Specialist** | Spatial boundaries, relational schema, data seeding, reverse geocoding | • [`backend/data/fixtures/boundaries/khordha_pilot.geojson`](./backend/data/fixtures/boundaries/khordha_pilot.geojson)<br/>• [`backend/app/services/boundary_service.py`](./backend/app/services/boundary_service.py)<br/>• [`backend/seed_pilot.py`](./backend/seed_pilot.py)<br/>• `/api/v1/places/boundaries` & `/reverse` endpoints |
+| **Frontend & PWA Specialist** | MapLibre rendering, responsive UI, multi-domain panels, provenance drawer | • [`frontend/src/components/MapView.tsx`](./frontend/src/components/MapView.tsx)<br/>• [`frontend/src/pages/HomePage.tsx`](./frontend/src/pages/HomePage.tsx)<br/>• [`frontend/src/api/client.ts`](./frontend/src/api/client.ts)<br/>• Offline detection, report exporter & styling |
+| **Safety & Quality Auditor** | Contract enforcement, anti-hallucination audits, regression tests | • [`backend/tests/test_pilot_data.py`](./backend/tests/test_pilot_data.py) (24 new test cases)<br/>• [`docs/PILOT_VERIFICATION_REPORT.md`](./docs/PILOT_VERIFICATION_REPORT.md)<br/>• 52/52 passing backend tests |
 
 ---
 
-## 🛡️ 3. The 10 Non-Negotiable Anti-Hallucination Principles
+## System Architecture
 
-Every layer of Project Garuda enforces ten unbreakable data governance rules:
+Garuda combines an asynchronous FastAPI service with a client-side React PWA and a local SQLite database configured for high-concurrency read operations:
 
-> [!IMPORTANT]
-> **1. No Hallucination:** Every factual claim must link to a citable, registered source ID, reference period, and published license.  
-> **2. No Fake Live Data:** Historical figures (e.g., Census 2011) are stamped `Historical (2011)`. Zero algorithmic projection or fake real-time counters.  
-> **3. No Invented Boundaries:** If village boundary polygons are unavailable, coordinates and parent administrative units are displayed with `geometry_available: false`.  
-> **4. Zero Planned Spend:** Default path requires ₹0 cash spend. Fully operational on local SQLite, CARTO raster basemaps, and public open data feeds.  
-> **5. No Committed Secrets:** Zero credentials or sensitive keys committed to version control.  
+```mermaid
+flowchart LR
+    subgraph Client ["Client Browser / PWA"]
+        UI["React 18 Dashboard"]
+        Map["MapLibre GL Map"]
+        Store["Local Bookmarks & Export"]
+    end
 
-> [!CAUTION]
-> **6. No Medical Diagnosis:** Garuda is an institutional place intelligence tool, not a clinical diagnostic device. Health cards carry non-negotiable disclaimers.  
-> **7. No Unapproved Public Launch:** Visible watermark: *"DEMO / PILOT MODE — Khordha, Odisha — For Internal & Field Evaluation Only"*.  
-> **8. No Silent Fallbacks:** District-level metrics are never silently presented as village-level observations.  
-> **9. Documented Data Access:** Every source is registered in `/api/v1/sources` with terms, publisher, and access mode.  
-> **10. Unknown is Acceptable:** Missing fields return `status: "unavailable"` and explicit `data_gaps`, never defaulting to `0`.  
+    subgraph Gateway ["Reverse Proxy / Local Dev"]
+        ViteProxy["Vite Dev Proxy (:5173) / Nginx"]
+    end
 
----
+    subgraph Service ["Backend Service (:8000)"]
+        API["FastAPI 0.115+ Router"]
+        Security["Middleware<br/>(RateLimit, CSP, SecurityHeaders)"]
+        Spatial["Boundary Engine<br/>(Ray-Casting Point-in-Polygon)"]
+        Cache["In-Memory Cache<br/>(Granular Source TTLs)"]
+    end
 
-## 📊 4. The Seven Intelligence Domains
+    subgraph Storage ["Local Storage"]
+        DB[("SQLite WAL Engine<br/>garuda_local.db")]
+        Fixtures["GeoJSON Fixtures<br/>(Pilot Boundaries)"]
+    end
 
-| Domain | Verified Source & Publisher | Reference Period | Ingested Pilot Indicators |
-|:---|:---|:---|:---|
-| **👥 Demographics** | Office of the Registrar General, India (Census 2011 PCA) | `2011 (historical)` | Total population, male/female counts, sex ratio, literacy rate %, households |
-| **🏥 Public Health** | Ministry of Health & Family Welfare / NHM Odisha | `2026 (current)` | Primary Health Centres (PHC = 34), Community Health Centres (CHC = 10), Sub-centres (218), District Hospitals (2) |
-| **🚨 Disease Alerts** | Integrated Disease Surveillance Programme (IDSP) / NCDC | `2026 (current)` | Dengue (142 cases), Cholera (18 cases), active water safety advisory with WHO link |
-| **🏫 Education & Services**| Unified District Information System for Education (UDISE+) | `2024 (current)` | 2,185 total schools (primary, secondary), drinking water access (94.6%), electrification (98.2%) |
-| **🏛️ History & Culture** | Archaeological Survey of India (ASI) | `Protected Heritage` | Lingaraj Temple (11th c.), Khandagiri Caves (2nd c. BCE), Dhauli Shanti Stupa (261 BCE), Chilika Ramsar |
-| **🛰️ Satellite & Environment**| ISRO / NRSC Bhuvan & Copernicus Sentinel-2 | `2026 (current)` | Forest cover (21.84%), Chilika water spread (1,165 sq km), AQI baseline (64.0) with scene metadata |
-| **🌦️ Weather & Hazards** | India Meteorological Department (IMD) / NDMA | `Real-time` | Surface temperature (31.8°C), 24h rainfall (4.6 mm), NDMA cyclone preparedness advisory |
-
----
-
-## 🗺️ 5. Pilot Territory: Khordha District, Odisha (`IN-OD-29`)
-
-The pilot deployment models Khordha District across three administrative tiers:
-
-```
-Odisha (IN-OD) [State]
-└── Khordha (IN-OD-29) [District]
-    ├── Bhubaneswar (IN-OD-BBSR) [City / Municipal Corporation]
-    ├── Jatni (IN-OD-JAT) [Town / Municipality]
-    ├── Khordha Town (IN-OD-KHD) [Town / Headquarters]
-    ├── Begunia (IN-OD-BEG) [Rural Block]
-    ├── Bolagarh (IN-OD-BOL) [Rural Block]
-    ├── Tangi (IN-OD-TAN) [Rural Block]
-    ├── Chilika (IN-OD-CHI) [Rural Block]
-    └── Banapur (IN-OD-BAN) [Rural Block]
+    UI --> ViteProxy
+    Map --> ViteProxy
+    ViteProxy -->|/api/v1/*| Security
+    Security --> API
+    API --> Spatial
+    API --> Cache
+    API --> DB
+    Spatial --> Fixtures
 ```
 
 ---
 
-## 📁 6. Consolidated Project Layout
+## Repository Structure
 
 ```
 garuda/
-├── backend/                       # FastAPI Backend Application
-│   ├── app/                       # Application modules (api, core, db, domain, models, services)
-│   ├── data/fixtures/boundaries/  # khordha_pilot.geojson (10 verified polygons)
-│   ├── tests/                     # Test suite (52 tests across health, pilot data, API contracts)
-│   ├── pyproject.toml             # Python package configuration
+├── backend/                       # FastAPI application, database & tests
+│   ├── app/                       # Application package
+│   │   ├── api/routes/            # REST route controllers (places, sources, health, admin)
+│   │   ├── core/                  # Security headers, rate limiting, errors, configuration
+│   │   ├── db/                    # SQLAlchemy engine, session maker & SQLite pragmas
+│   │   ├── domain/                # Pydantic v2 data contracts, schemas & enums
+│   │   ├── models/                # SQLAlchemy ORM entities (Place, Source, Observation)
+│   │   └── services/              # Place service, boundary service, cache & freshness
+│   ├── data/fixtures/             # Sample datasets and GeoJSON boundary files
+│   │   └── boundaries/            # khordha_pilot.geojson (10 administrative polygons)
+│   ├── tests/                     # Pytest suite (52 tests across unit & integration)
 │   ├── Makefile                   # Backend commands (make dev, make test, make seed)
-│   └── seed_pilot.py              # Database seeder (10 places, 19 aliases, 7 sources, 103 observations)
+│   ├── pyproject.toml             # Python build configuration and dependencies
+│   └── seed_pilot.py              # Automated database seeder (103 verified observations)
 │
 ├── frontend/                      # React 18 + TypeScript + Vite PWA
-│   ├── src/                       # Application code (api, components, pages, styles, types)
-│   ├── public/                    # PWA manifest and vector icons
-│   ├── package.json               # Frontend dependencies and scripts
+│   ├── public/                    # Web manifest and static icons
+│   ├── src/                       # Application source code
+│   │   ├── api/                   # API client with resilient offline fallbacks
+│   │   ├── components/            # MapView (MapLibre GL JS) and navigation widgets
+│   │   ├── pages/                 # HomePage multi-panel intelligence explorer
+│   │   ├── styles/                # High-contrast responsive dark theme
+│   │   └── types/                 # Shared TypeScript contract interfaces
 │   ├── Makefile                   # Frontend commands (make dev, make build)
-│   └── vite.config.ts             # Vite bundler & reverse proxy setup
+│   ├── package.json               # Frontend dependencies and npm scripts
+│   ├── tsconfig.json              # Strict TypeScript compiler options
+│   └── vite.config.ts             # Bundler configuration and API reverse proxy
 │
-├── docs/                          # Master Documentation Repository
-│   ├── PRODUCTION.md              # Consolidated Master Production & Operations Manual
-│   ├── SETUP.md                   # Multi-platform setup guide (Linux, macOS, Windows)
-│   ├── PILOT_VERIFICATION_REPORT.md # Formal Khordha pilot verification report
-│   ├── phases/                    # Stage-wise roadmap specifications (Phases 00–10)
-│   ├── source-register/           # Licensing inventory and source evaluations
-│   └── India_Place_Intelligence_Platform_Development_Plan.pdf # Authoritative blueprint
+├── docs/                          # Consolidated Project Documentation
+│   ├── PRODUCTION.md              # Unified Master Production & Operations Manual
+│   ├── SETUP.md                   # Multi-platform local development guide
+│   ├── PILOT_VERIFICATION_REPORT.md # Formal Khordha pilot verification audit
+│   ├── phases/                    # Roadmap phase documents (Phases 00–10)
+│   ├── source-register/           # Licensing inventory and source evaluation logs
+│   └── India_Place_Intelligence_Platform_Development_Plan.pdf # Master development plan
 │
-├── Makefile                       # Root orchestration Makefile
-├── README.md                      # Project documentation (this file)
-├── .env.example                   # Environment variable template
-└── LICENCE                        # MIT Open-Source Licence
+├── Makefile                       # Top-level workspace Makefile
+├── README.md                      # Project front page (this document)
+├── .env.example                   # Environment configuration template
+├── .gitignore                     # Strict production git ignore rules
+├── ATTRIBUTION.md                 # Open-source and open-data attributions
+└── LICENCE                        # MIT Open-Source License
 ```
 
 ---
 
-## ⚡ 7. Quick Start Guide
+## Prerequisites & Environment
 
-### Prerequisites
-- **Python 3.12+**
-- **Node.js 20+** & npm
+| Dependency | Minimum Version | Verified Runtime | Purpose |
+|:---|:---|:---|:---|
+| **Python** | 3.12+ | Python 3.12.3 | FastAPI backend, spatial computations, database seeding |
+| **Node.js** | 20+ | Node.js v20.x | Frontend build pipeline and Vite development server |
+| **npm** | 10+ | npm 10.x | Node package management |
+| **SQLite** | 3.35+ | SQLite 3.45+ | Local-first relational database with WAL support |
+| **Operating System** | Linux, macOS, or Windows | Ubuntu / Pop!_OS / Windows 11 | Fully cross-platform |
 
-### Starting the Application (From Root)
+---
 
+## Installation & Setup
+
+### 1. Clone the Repository
 ```bash
-# Clone the repository
 git clone https://github.com/johan-droid/Garuda.git
 cd Garuda
+```
 
-# Terminal 1: Backend API (FastAPI)
+### 2. Configure Environment Variables
+Copy the template configuration file:
+```bash
+cp .env.example .env
+```
+*(The defaults are pre-configured for local development with zero paid keys required).*
+
+### 3. Backend Setup
+```bash
+# Create and activate Python virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install backend dependencies in editable mode
+pip install -e backend
+
+# Initialize database schema and populate pilot dataset
+make init-db
+make seed
+```
+
+### 4. Frontend Setup
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+---
+
+## Quick Start
+
+Garuda can be run from the root directory using the root `Makefile` or started independently within each directory.
+
+### Running from Project Root
+
+```bash
+# Terminal 1 — Backend API (FastAPI)
 make dev-backend
-# Runs at http://localhost:8000 (Interactive Docs: http://localhost:8000/docs)
+# Runs at http://localhost:8000
+# Interactive OpenAPI Docs: http://localhost:8000/docs
 
-# Terminal 2: Frontend PWA (React + Vite)
+# Terminal 2 — Frontend PWA (React + Vite)
 make dev-frontend
 # Runs at http://localhost:5173
 ```
 
-*(You can also execute commands directly inside `backend/` using `make dev-api`, and inside `frontend/` using `make dev`)*.
+### Running from Subdirectories
+If preferred, you can run directly inside the service folders:
+
+```bash
+# Backend directory
+cd backend
+make dev-api
+```
+
+```bash
+# Frontend directory
+cd frontend
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser. The Vite proxy forwards `/api/*` and `/health` requests to `http://localhost:8000`.
 
 ---
 
-## 🧪 8. Automated Testing & Verification
+## Configuration Reference
 
-Garuda enforces automated regression gates across backend contracts, spatial reverse geocoding, and frontend build integrity:
+Settings are managed via environment variables and loaded by `backend/app/core/config.py`:
 
+| Variable | Type | Default | Description |
+|:---|:---|:---|:---|
+| `ENVIRONMENT` | string | `development` | Environment mode (`development`, `staging`, `production`, `testing`). |
+| `DEBUG` | boolean | `false` | Debug mode. Automatically blocked if `ENVIRONMENT=production`. |
+| `DATABASE_URL` | string | `sqlite:///./garuda_local.db` | SQLAlchemy database URL. Supports SQLite and PostgreSQL. |
+| `SECRET_KEY` | string | `dev-only-secret-...` | Cryptographic secret. Must be 32+ characters in production. |
+| `ADMIN_API_KEY` | string | `garuda-local-dev...` | Bearer token required for `/api/v1/admin/*` dataset imports. |
+| `ALLOWED_ORIGINS` | list | `["http://localhost:5173", ...]` | CORS whitelist. Wildcards (`*`) are disallowed in production. |
+| `RATE_LIMIT_ENABLED` | boolean | `true` | Sliding-window IP rate limiter. |
+| `RATE_LIMIT_PUBLIC_PER_MINUTE` | integer | `60` | Maximum public API requests allowed per minute per IP. |
+| `RATE_LIMIT_SEARCH_PER_MINUTE` | integer | `30` | Maximum search requests allowed per minute per IP. |
+| `LOG_JSON` | boolean | `false` | Emit structured JSON logs when set to `true`. |
+| `LOG_LEVEL` | string | `INFO` | Logging threshold (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
+
+---
+
+## API Reference & Usage Examples
+
+All public read endpoints require no authentication. Administrative write endpoints require `Authorization: Bearer <ADMIN_API_KEY>`.
+
+### Key Endpoints
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/health` | Application health and database readiness probe |
+| `GET` | `/health/live` | Kubernetes liveness probe (does not touch database) |
+| `GET` | `/health/ready` | Kubernetes readiness probe (checks database connection) |
+| `GET` | `/api/v1/places/search?q={query}` | Search places by canonical name or alias |
+| `GET` | `/api/v1/places/{id}/profile` | Aggregated multi-domain place intelligence profile |
+| `GET` | `/api/v1/places/{id}/observations` | Raw measured facts with citable provenance metadata |
+| `GET` | `/api/v1/places/{id}/alerts` | Official health advisories with active/expired filtering |
+| `GET` | `/api/v1/places/{id}/status` | Domain-level freshness summary and worst-case status badge |
+| `GET` | `/api/v1/places/boundaries` | GeoJSON FeatureCollection of supported boundaries |
+| `GET` | `/api/v1/places/reverse?lat={lat}&lng={lng}` | Spatial reverse geocoder (enclosing unit or nearest centroid) |
+| `GET` | `/api/v1/sources` | Public source register of licensed open datasets |
+| `GET` | `/api/v1/sources/diagnostics` | Operational health, latency, record counts, and TTLs |
+| `POST`| `/api/v1/admin/import` | Atomic dataset batch import (`ADMIN_API_KEY` required) |
+
+### CLI / cURL Examples
+
+#### 1. Check Service Health
 ```bash
-# Run the complete test suite (52 automated tests)
+curl -s http://localhost:8000/health | jq .
+```
+```json
+{
+  "status": "healthy",
+  "note": "This is application health, not public-health data.",
+  "version": "1.0.0",
+  "environment": "development",
+  "database": { "ok": true }
+}
+```
+
+#### 2. Search for a Place (with Alias Matching)
+```bash
+curl -s "http://localhost:8000/api/v1/places/search?q=Khurda" | jq .
+```
+```json
+{
+  "query": "Khurda",
+  "results": [
+    {
+      "place": {
+        "id": "IN-OD-29",
+        "canonical_name": "Khordha",
+        "place_type": "district",
+        "coordinates": [20.18, 85.615],
+        "geometry_available": true
+      },
+      "score": 0.85,
+      "match_type": "alias"
+    }
+  ],
+  "total": 1
+}
+```
+
+#### 3. Reverse Geocode Coordinates
+```bash
+curl -s "http://localhost:8000/api/v1/places/reverse?lat=20.2961&lng=85.8245" | jq .
+```
+```json
+{
+  "place": {
+    "id": "IN-OD-BBSR",
+    "canonical_name": "Bhubaneswar",
+    "place_type": "subdistrict"
+  },
+  "hierarchy": {
+    "state": "Odisha",
+    "district": "Khordha",
+    "subdistrict": "Bhubaneswar"
+  },
+  "match_type": "enclosing",
+  "distance_km": 0.0
+}
+```
+
+#### 4. Retrieve Active Health Alerts
+```bash
+curl -s "http://localhost:8000/api/v1/places/IN-OD-29/alerts" | jq .
+```
+
+---
+
+## Pilot Territory: Khordha District, Odisha
+
+The pilot deployment models Khordha District in Odisha (`IN-OD-29`), providing verified data for 10 administrative units:
+
+| Entity Name | Place ID | Administrative Level | Centroid (Lat, Lng) | Geometry Type |
+|:---|:---|:---|:---|:---|
+| **Odisha** | `IN-OD` | State | 20.9517° N, 85.0985° E | Boundary Polygon |
+| **Khordha** | `IN-OD-29` | District | 20.1800° N, 85.6150° E | Boundary Polygon |
+| **Bhubaneswar** | `IN-OD-BBSR` | City / Municipal Corp | 20.2961° N, 85.8245° E | Boundary Polygon |
+| **Jatni** | `IN-OD-JAT` | Town / Municipality | 20.1633° N, 85.7067° E | Boundary Polygon |
+| **Khordha Town** | `IN-OD-KHD` | Town / Headquarters | 20.1800° N, 85.6150° E | Boundary Polygon |
+| **Begunia** | `IN-OD-BEG` | Rural Block / Tehsil | 20.2100° N, 85.4600° E | Boundary Polygon |
+| **Bolagarh** | `IN-OD-BOL` | Rural Block / Tehsil | 20.1800° N, 85.2800° E | Boundary Polygon |
+| **Tangi** | `IN-OD-TAN` | Rural Block / Tehsil | 19.9200° N, 85.4000° E | Boundary Polygon |
+| **Chilika** | `IN-OD-CHI` | Rural Block / Tehsil | 19.7800° N, 85.2500° E | Boundary Polygon |
+| **Banapur** | `IN-OD-BAN` | Rural Block / Tehsil | 19.7800° N, 85.1000° E | Boundary Polygon |
+
+### Ingested Pilot Intelligence Across 7 Domains
+1. **Demographics:** Census 2011 Primary Census Abstract (total population, male, female, sex ratio, literacy rate %, households).
+2. **Public Health Facilities:** MoHFW / NHM Odisha directory (PHCs = 34, CHCs = 10, Sub-centres = 218, District Hospitals = 2).
+3. **Disease Surveillance & Advisories:** IDSP weekly surveillance records (dengue, cholera) and dated water safety alerts with WHO prevention links.
+4. **Education & Basic Services:** UDISE+ school counts (2,185 total), drinking water coverage (94.6%), and electrification (98.2%).
+5. **History & Heritage:** Archaeological Survey of India (ASI) protected monuments (Lingaraj Temple, Khandagiri & Udayagiri Caves, Dhauli Shanti Stupa, Chilika Ramsar wetland).
+6. **Environment & Satellite:** ISRO / NRSC Bhuvan & Copernicus Sentinel-2 indicators (forest cover: 21.84%, Chilika water spread: 1,165 sq km, AQI baseline: 64.0) with scene metadata.
+7. **Weather & Disasters:** IMD Bhubaneswar station observations (temperature, rainfall) and NDMA preparedness advisories.
+
+---
+
+## Data Governance & Anti-Hallucination Principles
+
+Project Garuda adheres strictly to 10 foundational data integrity rules:
+
+1. **No Hallucination:** Every factual value requires a verified `source_id`, reference period, and published license.
+2. **No Fake Live Data:** Census figures are stamped `Historical (2011)`. Zero unstated interpolations or real-time simulation tickers.
+3. **No Invented Boundaries:** Where village vector polygons do not exist, coordinates and parent units are shown with `geometry_available: false`.
+4. **Zero Planned Spend:** Local SQLite, CARTO raster basemaps, and free open public data sources.
+5. **No Committed Secrets:** Credentials and real secrets are prohibited from version control.
+6. **No Individual Medical Diagnosis:** Public health cards display institutional surveillance only, with clear disclaimers.
+7. **No Unapproved Public Launch:** Visible watermark: *"DEMO / PILOT MODE — Khordha, Odisha — For Internal & Field Evaluation Only"*.
+8. **No Silent Fallbacks:** District data is never silently substituted as village data.
+9. **Documented Data Access:** Every dataset is registered in `/api/v1/sources` with terms, publisher, and access mode.
+10. **Unknown is Acceptable:** Missing fields return `status: "unavailable"` and explicit `data_gaps`, never defaulting to `0`.
+
+---
+
+## Testing & Quality Verification
+
+Garuda enforces strict automated testing across the API layer, spatial models, health contracts, and frontend build:
+
+### Running the Test Suite
+```bash
+# Run all backend unit, contract, and integration tests
 make test
+```
 
-# Run backend static type checking (mypy)
+### Static Type Checking & Linting
+```bash
+# Run backend type checking with mypy
 make lint
+```
 
-# Verify frontend production build (TypeScript + Vite)
+### Frontend Build Verification
+```bash
+# Verify TypeScript compilation and Vite production packaging
 make build
 ```
 
+### Test Suite Execution Output
 ```
-============================== test session starts ==============================
+============================= test session starts ==============================
 collected 52 items
 
 backend/tests/test_health.py ........                                    [ 15%]
@@ -208,40 +463,73 @@ backend/tests/test_public_api.py ....................                    [100%]
 
 ---
 
-## 📡 9. REST API Endpoint Reference
+## Security & Responsible Use
 
-| HTTP Method | Route | Description |
-|:---|:---|:---|
-| `GET` | `/health` | Application health metadata (version, pilot district) |
-| `GET` | `/health/live` | Kubernetes liveness probe |
-| `GET` | `/health/ready` | Kubernetes readiness probe (verifies database connectivity) |
-| `GET` | `/api/v1/places/search?q={query}` | Search places by canonical name or historical alias |
-| `GET` | `/api/v1/places/{id}/profile` | Multi-panel aggregated place profile |
-| `GET` | `/api/v1/places/{id}/observations` | Raw observations with citable provenance metadata |
-| `GET` | `/api/v1/places/{id}/alerts` | Official health advisories with active/expired filtering |
-| `GET` | `/api/v1/places/boundaries` | GeoJSON FeatureCollection of supported boundary polygons |
-| `GET` | `/api/v1/places/reverse?lat={lat}&lng={lng}` | Ray-casting point-in-polygon reverse geocoding |
-| `GET` | `/api/v1/sources` | Registered data source directory with licenses |
-| `GET` | `/api/v1/sources/diagnostics` | Operational source diagnostics, record counts, and TTLs |
-| `POST`| `/api/v1/admin/import` | Atomic dataset batch import (`Bearer` auth protected) |
+- **Security Headers:** The API applies `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and customizable Content Security Policy (CSP) headers.
+- **Request Boundaries:** Payload bodies are capped at 1MB (5MB for admin imports); query strings and pagination parameters are strictly bounded.
+- **Safe Database Access:** SQLAlchemy 2.0 parameterized queries eliminate SQL injection risks.
+- **Rate Limiting:** Sliding-window IP rate limiting prevents denial-of-service on search and profile endpoints.
+- **Non-Clinical Disclaimer:** Garuda does not provide individual medical diagnosis or treatment instructions. Public health statistics represent aggregate epidemiological surveillance only.
 
 ---
 
-## 📖 10. Operations & Master Production Manual
+## Troubleshooting
 
-For production deployment instructions (Systemd service setup, Nginx reverse proxy configuration, SQLite WAL hot backups, security checklists, and incident response runbooks), read the consolidated production manual:
+### 1. `sqlite3.OperationalError: database is locked`
+- **Cause:** Multiple concurrent processes writing to SQLite without WAL mode or exceeding `DB_TIMEOUT`.
+- **Solution:** Verify WAL mode is active:
+  ```bash
+  sqlite3 garuda_local.db "PRAGMA journal_mode=WAL;"
+  ```
 
-👉 **[docs/PRODUCTION.md](./docs/PRODUCTION.md)**
+### 2. Frontend Shows "Backend offline (mock mode)"
+- **Cause:** Backend server is not running on port 8000, or proxy target is misconfigured.
+- **Solution:** Start the backend with `make dev-backend` and verify `http://localhost:8000/health` answers with 200 OK.
+
+### 3. Missing `garuda_local.db` or Empty Search Results
+- **Cause:** Database was not initialized or seeded.
+- **Solution:** Run the seeder from project root:
+  ```bash
+  make init-db
+  make seed
+  ```
 
 ---
 
-## 📜 11. Licence & Attributions
+## Contributing
 
-- **Source Code Licence:** [MIT Licence](./LICENCE).
-- **Data & Mapping Attributions:**
-  - Administrative Boundaries & Census Statistics: Office of the Registrar General, India / Survey of India (GODL-India).
-  - Public Health Surveillance: Ministry of Health & Family Welfare / National Health Mission Odisha (GODL-India).
-  - Vector Basemap & Tiles: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL) | © [CARTO](https://carto.com/) (CC-BY 4.0).
-  - Cultural Heritage Records: Archaeological Survey of India (ASI).
-  - Remote Sensing Indicators: ISRO / NRSC Bhuvan & Copernicus Sentinel-2.
-  - Complete inventory available in [ATTRIBUTION.md](./ATTRIBUTION.md).
+We welcome contributions from developers, researchers, and open data advocates!
+
+1. Fork the repository on GitHub.
+2. Create a topic branch: `git checkout -b feat/new-source-adapter`.
+3. Follow the 10 Non-Negotiable Anti-Hallucination Principles.
+4. Ensure all automated tests pass: `make test` and `make build`.
+5. Submit a pull request with full provenance and licensing documentation for any new dataset.
+
+---
+
+## License & Attributions
+
+### Software License
+Project Garuda source code is released under the **[MIT License](./LICENCE)**.
+
+### Data Attributions & Open Licenses
+- **Administrative Boundaries & Population Statistics:** Office of the Registrar General, India / Survey of India — [Government Open Data License (GODL-India)](https://data.gov.in).
+- **Public Health Surveillance & Facility Registers:** Ministry of Health & Family Welfare / National Health Mission Odisha — GODL-India.
+- **Vector Basemap & Map Tiles:** © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL 1.0) | © [CARTO](https://carto.com/) (CC-BY 4.0).
+- **Historical Heritage Records:** Archaeological Survey of India (ASI) — Public domain / open access citations.
+- **Remote Sensing Indicators:** National Remote Sensing Centre (NRSC) / ISRO Bhuvan & Copernicus Sentinel-2.
+- A comprehensive attribution register is maintained in **[ATTRIBUTION.md](./ATTRIBUTION.md)**.
+
+---
+
+## Documentation Index
+
+| Document | Purpose |
+|:---|:---|
+| 📖 **[docs/PRODUCTION.md](./docs/PRODUCTION.md)** | Unified Master Production, Deployment & Operations Manual |
+| 🛠️ **[docs/SETUP.md](./docs/SETUP.md)** | Detailed local setup guide for Linux, macOS, and Windows |
+| 📋 **[docs/PILOT_VERIFICATION_REPORT.md](./docs/PILOT_VERIFICATION_REPORT.md)** | Formal audit of Khordha pilot against 10 Non-Negotiable Principles |
+| 🗺️ **[docs/phases/](./docs/phases)** | Stage-wise implementation roadmap (Phases 00 through 10) |
+| 📜 **[docs/source-register/](./docs/source-register)** | Data source evaluations, blocker logs, and licensing register |
+| 📑 **[docs/India_Place_Intelligence_Platform_Development_Plan.pdf](./docs/India_Place_Intelligence_Platform_Development_Plan.pdf)** | Original master blueprint and system specification |
