@@ -185,6 +185,20 @@ export interface BoundaryProperties {
   [key: string]: any;
 }
 
+/**
+ * Shape actually returned by `GET /api/v1/places/boundaries` (see
+ * backend/app/services/boundary_service.py). `BoundaryProperties` above
+ * declares `name`/`level`, which the backend does not emit.
+ */
+export interface LiveBoundaryProperties {
+  id: string;
+  canonical_name: string;
+  place_type: string;
+  parent_id?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 export interface GeoJsonFeature<P = BoundaryProperties> {
   type: 'Feature';
   id?: string | number;
@@ -196,3 +210,5 @@ export interface GeoJsonFeatureCollection<P = BoundaryProperties> {
   type: 'FeatureCollection';
   features: GeoJsonFeature<P>[];
 }
+
+export type LiveBoundaryCollection = GeoJsonFeatureCollection<LiveBoundaryProperties>;

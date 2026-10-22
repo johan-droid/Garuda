@@ -134,3 +134,6 @@ desktop.ini
 *.orig
 *.rej
 scratch/
+
+# Cesium runtime assets copied from node_modules by vite.config.ts
+frontend/public/cesium/

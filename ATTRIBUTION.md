@@ -23,11 +23,25 @@ Garuda is built strictly on open data, public records, and permissive open-sourc
    - Licence: CC-BY 4.0.
    - Usage: Positron map tiles for explorer view.
 
+5. **Copernicus DEM GLO-30 (3D terrain POC only)**
+   - Publisher: European Space Agency / European Union Copernicus programme.
+   - Producer: produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.
+   - Terms: Copernicus DEM is free and open; access to the source products requires a Copernicus Data Space Ecosystem account.
+   - Tile delivery: Terrarium-encoded WebP tiles published by Mapterhorn (<https://mapterhorn.com/attribution>).
+   - Usage: Real elevation for the optional `?globe=1` Cesium 3D view. Not used by the default 2D map.
+
+6. **NASA Global Imagery Browse Services (GIBS)**
+   - Publisher: NASA Earth Science Data and Information System (ESDIS).
+   - Terms: NASA data are free and open; no key or registration required.
+   - Usage: Blue Marble shaded-relief/bathymetry base imagery plus `Reference_Features_15m` and `Reference_Labels_15m` cartographic overlays in the optional `?globe=1` Cesium 3D view.
+   - Acknowledgement (required): "We acknowledge the use of imagery provided by services from NASA's Global Imagery Browse Services (GIBS), part of NASA's Earth Science Data and Information System (ESDIS)."
+
 ## Core Open-Source Libraries
 - **FastAPI**: MIT Licence
 - **Pydantic**: MIT Licence
 - **SQLAlchemy**: MIT Licence
 - **MapLibre GL JS**: BSD-3-Clause Licence
+- **CesiumJS**: Apache License 2.0 (3D terrain POC only)
 - **React**: MIT Licence
 - **Vite**: MIT Licence
 - **TanStack Query**: MIT Licence

@@ -3,6 +3,7 @@ import {
   PlaceProfile,
   PanelResponse,
   GeoJsonFeatureCollection,
+  LiveBoundaryCollection,
   SourceDiagnostics,
   HealthAlertsResponse,
   Place,
@@ -1725,4 +1726,60 @@ export async function getHealthAlerts(placeId: string): Promise<HealthAlertsResp
     source_count: 0,
     note: 'No active health alerts recorded for this area.',
   };
+}
+
+// ---------------------------------------------------------------------------
+// Provenance-aware reads used by the Cesium 3D-terrain POC.
+// These never substitute mock or generated data: when the backend cannot be
+// reached they return `live: false` with empty/null data so the caller can
+// display the real state instead of presenting a fixture as live.
+// ---------------------------------------------------------------------------
+
+export interface LiveData<T> {
+  data: T;
+  /** True only when the backend answered 2xx with a usable body. */
+  live: boolean;
+}
+
+export async function getBoundariesWithProvenance(): Promise<LiveData<LiveBoundaryCollection>> {
+  try {
+    const res = await fetch(`${API_BASE}/places/boundaries`);
+    if (res.ok) {
+      return { data: (await res.json()) as LiveBoundaryCollection, live: true };
+    }
+  } catch {
+    // backend unreachable
+  }
+  return { data: { type: 'FeatureCollection', features: [] }, live: false };
+}
+
+export async function getPlaceProfileWithProvenance(
+  placeId: string,
+): Promise<LiveData<PlaceProfile | null>> {
+  try {
+    const res = await fetch(`${API_BASE}/places/${encodeURIComponent(placeId)}/profile`);
+    if (res.ok) {
+      return { data: normalizePlaceProfile((await res.json()) as PlaceProfile), live: true };
+    }
+  } catch {
+    // backend unreachable
+  }
+  return { data: null, live: false };
+}
+
+export async function reverseGeocodeWithProvenance(
+  lat: number,
+  lng: number,
+): Promise<LiveData<Place | null>> {
+  try {
+    const res = await fetch(`${API_BASE}/places/reverse?lat=${lat}&lng=${lng}`);
+    if (res.ok) {
+      const data = await res.json();
+      const place: Place | undefined = data.place ?? (data.id ? data : undefined);
+      if (place) return { data: place, live: true };
+    }
+  } catch {
+    // backend unreachable
+  }
+  return { data: null, live: false };
 }
