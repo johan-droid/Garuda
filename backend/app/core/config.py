@@ -10,7 +10,7 @@ Security notes:
 """
 
 from functools import lru_cache
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -75,6 +75,7 @@ class Settings(BaseSettings):
 
     # CORS & Security
     ALLOWED_ORIGINS: List[str] = Field(
+        validation_alias=AliasChoices("ALLOWED_ORIGINS", "CORS_ORIGINS", "GARUDA_ALLOWED_ORIGINS"),
         default=[
             "http://localhost:3000",
             "http://localhost:5173",
@@ -101,7 +102,11 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = Field(default=True, description="Enable request rate limiting")
-    RATE_LIMIT_PUBLIC_PER_MINUTE: int = Field(default=60, description="Max public requests per minute per IP")
+    RATE_LIMIT_PUBLIC_PER_MINUTE: int = Field(
+        validation_alias=AliasChoices("RATE_LIMIT_PUBLIC_PER_MINUTE", "RATE_LIMIT_PER_MINUTE", "GARUDA_RATE_LIMIT_PER_MINUTE"),
+        default=60,
+        description="Max public requests per minute per IP",
+    )
     RATE_LIMIT_SEARCH_PER_MINUTE: int = Field(default=30, description="Max search requests per minute per IP")
     RATE_LIMIT_ADMIN_PER_MINUTE: int = Field(default=10, description="Max admin requests per minute per IP")
 

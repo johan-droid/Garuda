@@ -96,28 +96,33 @@ def determine_status(observation: Observation, now: datetime | None = None) -> D
 
 
 def _domain_for_observation(observation: Observation) -> str:
-    """Infer the domain of an observation from its field name.
+    """Infer the domain of an observation from its contract or field name.
 
     Health observations are identifiable by their health category; other
     domains are inferred from the field name prefix.
     """
-    from app.domain.contracts import HealthObservation
+    if hasattr(observation, "domain") and getattr(observation, "domain", None):
+        return str(getattr(observation, "domain"))
 
-    if isinstance(observation, HealthObservation):
+    from app.domain.contracts import HealthObservation, HealthObservationView
+
+    if isinstance(observation, (HealthObservation, HealthObservationView)) or hasattr(observation, "health_category"):
         return "health"
     field = observation.field_name.lower()
-    if field.startswith(("population_", "demographic_", "literacy_")):
+    if field.startswith(("population_", "demographic_", "literacy_", "total_", "female_", "male_", "sex_ratio")):
         return "demographics"
-    if field.startswith(("health_", "case_", "disease_")):
+    if field.startswith(("health_", "case_", "disease_", "surveillance_", "outbreak_")):
         return "health"
-    if field.startswith(("facility_", "school_", "hospital_", "clinic_")):
+    if field.startswith(("facility_", "school_", "hospital_", "clinic_", "drinking_water", "electrification")):
         return "services"
     if field.startswith(("road_", "connectivity_", "network_")):
         return "infrastructure"
-    if field.startswith(("air_", "water_", "soil_", "noise_")):
+    if field.startswith(("air_", "water_", "soil_", "noise_", "forest_", "chilika_")):
         return "environment"
-    if field.startswith(("disaster_", "flood_", "cyclone_", "seismic_")):
-        return "resilience"
+    if field.startswith(("disaster_", "flood_", "cyclone_", "seismic_", "surface_temperature", "rainfall")):
+        return "weather_disasters"
+    if field.startswith(("heritage_", "monument_")):
+        return "history_culture"
     return "demographics"
 
 
@@ -185,5 +190,3 @@ def summarize_domain(
 def freshness_window(domain: str) -> timedelta:
     """Return the freshness window for a domain as a timedelta."""
     return timedelta(days=max_age_days_for(domain))
-
-    return "demographics"

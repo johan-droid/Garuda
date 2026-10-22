@@ -13,7 +13,6 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.domain.contracts import AdminHierarchy, Place, ReverseGeocodeResponse
-from app.models.entities import PlaceModel
 from app.services.place_service import build_hierarchy, get_place, load_aliases, _to_place
 
 

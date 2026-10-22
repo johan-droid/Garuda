@@ -90,6 +90,7 @@ export interface Observation {
   reference_period_end?: string | null;
   published_at?: string | null;
   notes?: string | null;
+  domain?: string | null;
 
   // Health-specific extended fields
   health_category?: string;

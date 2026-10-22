@@ -70,11 +70,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=ashutoshsahoo
-WorkingDirectory=/home/ashutoshsahoo/Downloads/Garuda /backend
-Environment="PATH=/home/ashutoshsahoo/Downloads/Garuda /.venv/bin:/usr/local/bin:/usr/bin"
-EnvironmentFile=/home/ashutoshsahoo/Downloads/Garuda /.env
-ExecStart=/home/ashutoshsahoo/Downloads/Garuda /.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+User=garuda
+WorkingDirectory=/opt/garuda/backend
+Environment="PATH=/opt/garuda/.venv/bin:/usr/local/bin:/usr/bin"
+EnvironmentFile=/opt/garuda/.env
+ExecStart=/opt/garuda/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
 Restart=always
 RestartSec=5
 
@@ -90,10 +90,10 @@ sudo systemctl enable --now garuda-backend
 
 #### 3. Frontend Static Build & Hosting
 ```bash
-cd /home/ashutoshsahoo/Downloads/Garuda /frontend
+cd /opt/garuda/frontend
 npm install
 npm run build
-# Built files placed in /home/ashutoshsahoo/Downloads/Garuda /frontend/dist
+# Built files placed in /opt/garuda/frontend/dist
 ```
 
 #### 4. Nginx Reverse Proxy Configuration (`/etc/nginx/sites-available/garuda`)
@@ -104,7 +104,7 @@ server {
 
     # Serve built React PWA
     location / {
-        root /home/ashutoshsahoo/Downloads/Garuda /frontend/dist;
+        root /opt/garuda/frontend/dist;
         index index.html;
         try_files $uri $uri/ /index.html;
         expires 1h;
@@ -184,6 +184,7 @@ sqlite3 garuda_local.db ".backup '$BACKUP_DIR/garuda_$TIMESTAMP.db'"
 
 # Compress and keep 14 days of backups
 gzip "$BACKUP_DIR/garuda_$TIMESTAMP.db"
+ln -sf "$BACKUP_DIR/garuda_$TIMESTAMP.db.gz" "$BACKUP_DIR/garuda_latest.db.gz"
 find "$BACKUP_DIR" -type f -name "*.db.gz" -mtime +14 -delete
 ```
 
@@ -283,13 +284,59 @@ stateDiagram-v2
 3. System continues serving cached records with complete transparency.
 
 ### Scenario 3: Emergency Data Rollback
-To restore a known good database snapshot:
+To restore a known good database snapshot safely without risking partial writes or database corruption:
+
 ```bash
+# 1. Stop backend service to halt all active database sessions and writes
 sudo systemctl stop garuda-backend
-cp /var/backups/garuda/garuda_latest.db garuda_local.db
+
+# 2. Verify backup archive exists and gzip integrity is uncompromised
+BACKUP_ARCHIVE="/var/backups/garuda/garuda_latest.db.gz"
+if [ ! -f "$BACKUP_ARCHIVE" ]; then
+    echo "ERROR: Backup archive $BACKUP_ARCHIVE not found!" >&2
+    exit 1
+fi
+gzip -t "$BACKUP_ARCHIVE" || { echo "ERROR: Backup archive corrupted!" >&2; exit 1; }
+
+# 3. Decompress into a temporary file on the target filesystem
+TMP_RESTORE="/opt/garuda/garuda_local.db.restore_tmp"
+gunzip -c "$BACKUP_ARCHIVE" > "$TMP_RESTORE"
+
+# 4. Verify SQLite database integrity before swapping
+INTEGRITY=$(python3 -c "import sqlite3; con=sqlite3.connect('$TMP_RESTORE'); res=con.execute('PRAGMA integrity_check').fetchone()[0]; print(res)")
+if [ "$INTEGRITY" != "ok" ]; then
+    echo "ERROR: Restored database failed integrity check: $INTEGRITY" >&2
+    rm -f "$TMP_RESTORE"
+    exit 1
+fi
+
+# 5. Set correct service ownership and permissions
+sudo chown garuda:garuda "$TMP_RESTORE"
+chmod 640 "$TMP_RESTORE"
+
+# 6. Atomically replace database file
+sudo mv "$TMP_RESTORE" /opt/garuda/garuda_local.db
+sudo rm -f /opt/garuda/garuda_local.db-wal /opt/garuda/garuda_local.db-shm
+
+# 7. Restart service and verify health readiness
 sudo systemctl start garuda-backend
-curl http://localhost:8000/health/ready
+curl -f http://127.0.0.1:8000/health/ready || {
+    echo "CRITICAL: Service failed readiness check following restore!" >&2
+    exit 1
+}
 ```
+
+#### Recovery if Restoration or Startup Fails
+If `PRAGMA integrity_check` fails on the latest archive:
+1. Inspect available timestamped archives: `ls -lt /var/backups/garuda/garuda_*.db.gz`
+2. Select the next most recent timestamped archive and repeat steps 2–7 with that specific file.
+3. If all archives are corrupt, reinitialize and reseed the base pilot dataset:
+   ```bash
+   cd /opt/garuda/backend
+   python3 -m app.db.init_db
+   python3 seed_pilot.py
+   sudo systemctl restart garuda-backend
+   ```
 
 ---
 

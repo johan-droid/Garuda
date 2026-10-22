@@ -12,7 +12,7 @@ expired or excluded, and the caller is told which.
 from datetime import UTC, date, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -63,7 +63,7 @@ def list_observations(
         conditions.append(ObservationModel.reference_period_start.is_not(None))
         conditions.append(ObservationModel.reference_period_start <= period_end)
 
-    total = len(list(session.scalars(select(ObservationModel.id).where(*conditions))))
+    total = session.scalar(select(func.count()).select_from(ObservationModel).where(*conditions)) or 0
 
     rows = list(
         session.scalars(

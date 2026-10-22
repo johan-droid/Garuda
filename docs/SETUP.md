@@ -38,8 +38,8 @@ garuda/
 
 ### 1. Clone & Enter Repository
 ```bash
-git clone https://github.com/organization/garuda.git
-cd garuda
+git clone https://github.com/johan-droid/Garuda.git
+cd Garuda
 ```
 
 ### 2. Configure Environment

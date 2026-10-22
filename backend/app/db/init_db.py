@@ -11,10 +11,10 @@ API_ROOT = Path(__file__).resolve().parents[2]
 if str(API_ROOT) not in sys.path:
     sys.path.insert(0, str(API_ROOT))
 
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine  # noqa: E402
 
-import app.models.entities  # noqa: F401  (registers all entity mappings)
-from app.db.session import Base, engine
+import app.models.entities  # noqa: E402, F401  (registers all entity mappings)
+from app.db.session import Base, engine  # noqa: E402
 
 
 def init_db(engine_override: Engine | None = None) -> None:

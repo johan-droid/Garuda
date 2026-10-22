@@ -7,11 +7,10 @@ from pathlib import Path
 
 import pytest
 
-# Point the app at a throwaway database and a known admin key before the
-# application package is imported.
-_TEST_DB = Path(tempfile.gettempdir()) / "garuda_test_suite.db"
-if _TEST_DB.exists():
-    _TEST_DB.unlink()
+# Point the app at a unique temporary database directory and a known admin key
+# before the application package is imported.
+_TEST_DIR = tempfile.TemporaryDirectory(prefix="garuda_test_")
+_TEST_DB = Path(_TEST_DIR.name) / "garuda_test.db"
 
 os.environ["ENVIRONMENT"] = "testing"
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB}"
@@ -45,8 +44,10 @@ def _schema() -> Iterator[None]:
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
-    if _TEST_DB.exists():
-        _TEST_DB.unlink()
+    try:
+        _TEST_DIR.cleanup()
+    except Exception:
+        pass
 
 
 @pytest.fixture()

@@ -91,6 +91,7 @@ class Observation(BaseModel):
     quality_status: DataStatus
     licence: str | None = None
     notes: str | None = Field(default=None, max_length=1000)
+    domain: str | None = None
 
 
 class HealthObservation(Observation):

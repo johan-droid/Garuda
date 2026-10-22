@@ -40,7 +40,7 @@ def rate_limit_category(path: str) -> str:
     segments = _path_segments(path)
     if "admin" in segments:
         return RateLimitCategory.ADMIN
-    if "search" in segments or "places" in segments:
+    if "search" in segments:
         return RateLimitCategory.SEARCH
     return RateLimitCategory.PUBLIC
 

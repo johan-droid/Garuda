@@ -7,7 +7,7 @@ help:
 	@echo "  make seed           - Populate local database with Khordha pilot dataset"
 	@echo "  make dev-backend    - Start FastAPI backend server on port 8000"
 	@echo "  make dev-frontend   - Start Vite frontend development server on port 5173"
-	@echo "  make test           - Run both backend and frontend test suites"
+	@echo "  make test           - Run backend test suite"
 	@echo "  make lint           - Run linting and type checking on backend"
 	@echo "  make build          - Build frontend production bundle"
 	@echo "  make clean          - Remove cache and build artifacts"

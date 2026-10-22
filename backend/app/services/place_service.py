@@ -247,6 +247,7 @@ def to_observation(row: ObservationModel) -> Observation:
         quality_status=DataStatus(row.quality_status),
         licence=row.licence,
         notes=row.notes,
+        domain=row.domain,
     )
 
 
@@ -273,6 +274,7 @@ def to_health_observation(row: ObservationModel, now: datetime) -> HealthObserva
         quality_status=DataStatus(row.quality_status),
         licence=row.licence,
         notes=row.notes,
+        domain=row.domain or "health",
         health_category=HealthCategory(row.health_category) if row.health_category else HealthCategory.ROUTINE_SURVEILLANCE,
         issuing_authority=row.issuing_authority,
         valid_from=row.valid_from,

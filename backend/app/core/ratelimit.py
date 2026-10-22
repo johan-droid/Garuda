@@ -99,7 +99,7 @@ def limit_for(category: str, path: str) -> int:
     segments = [segment for segment in path.split("/") if segment]
     if category == RateLimitCategory.ADMIN or "admin" in segments:
         return settings.RATE_LIMIT_ADMIN_PER_MINUTE
-    if category == RateLimitCategory.SEARCH or "search" in segments or "places" in segments:
+    if category == RateLimitCategory.SEARCH or "search" in segments:
         return settings.RATE_LIMIT_SEARCH_PER_MINUTE
     return settings.RATE_LIMIT_PUBLIC_PER_MINUTE
 

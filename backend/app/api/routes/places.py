@@ -64,7 +64,7 @@ PlaceIdPath = Annotated[
 def search(
     request: Request,
     session: SessionDep,
-    q: Annotated[str, Query(max_length=500, description="Place name or alias")] = "",
+    q: Annotated[str, Query(max_length=settings.MAX_SEARCH_QUERY_LENGTH, description="Place name or alias")] = "",
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
     offset: Annotated[int, Query(ge=0)] = 0,
     type: Annotated[str | None, Query(description="Filter by place type")] = None,
@@ -139,7 +139,7 @@ def observations(
     period_start: Annotated[date | None, Query(description="Earliest reference period")] = None,
     period_end: Annotated[date | None, Query(description="Latest reference period")] = None,
     include_stale: Annotated[bool, Query(description="Include stale observations")] = True,
-    limit: Annotated[int, Query(ge=1, le=settings.MAX_PAGE_SIZE)] = 100,
+    limit: Annotated[int, Query(ge=1, le=settings.MAX_PAGE_SIZE)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict[str, Any]:
     """Return the observations behind a place's panels, with full provenance.

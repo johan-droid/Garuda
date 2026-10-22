@@ -1,6 +1,7 @@
 import {
   SearchResponse,
   PlaceProfile,
+  PanelResponse,
   GeoJsonFeatureCollection,
   SourceDiagnostics,
   HealthAlertsResponse,
@@ -1365,11 +1366,42 @@ export async function searchPlaces(query: string): Promise<SearchResponse> {
   };
 }
 
+/**
+ * Normalizes a place profile response ensuring both canonical backend keys
+ * and frontend consumer aliases are accessible.
+ */
+export function normalizePlaceProfile(profile: PlaceProfile): PlaceProfile {
+  if (!profile || !profile.panels) {
+    return profile;
+  }
+  const panels: Record<string, PanelResponse> = { ...profile.panels };
+
+  // 1. History & Culture mapping (history_culture <-> culture)
+  const culturePanel = panels.history_culture || panels.culture;
+  if (culturePanel) {
+    panels.culture = culturePanel;
+    panels.history_culture = culturePanel;
+  }
+
+  // 2. Weather & Disasters mapping (weather_disasters <-> weather)
+  const weatherPanel = panels.weather_disasters || panels.weather;
+  if (weatherPanel) {
+    panels.weather = weatherPanel;
+    panels.weather_disasters = weatherPanel;
+  }
+
+  return {
+    ...profile,
+    panels,
+  };
+}
+
 export async function getPlaceProfile(placeId: string): Promise<PlaceProfile> {
   try {
     const res = await fetch(`${API_BASE}/places/${encodeURIComponent(placeId)}/profile`);
     if (res.ok) {
-      return await res.json();
+      const data: PlaceProfile = await res.json();
+      return normalizePlaceProfile(data);
     }
   } catch {
     // Backend offline
@@ -1377,7 +1409,7 @@ export async function getPlaceProfile(placeId: string): Promise<PlaceProfile> {
 
   // Check fallback mock profiles
   if (MOCK_PROFILES[placeId]) {
-    return MOCK_PROFILES[placeId];
+    return normalizePlaceProfile(MOCK_PROFILES[placeId]);
   }
 
   // Generate generic profile from place metadata
@@ -1390,7 +1422,7 @@ export async function getPlaceProfile(placeId: string): Promise<PlaceProfile> {
   };
 
   // If selecting a known block under Khordha, inherit district context with appropriate attribution
-  return {
+  return normalizePlaceProfile({
     place,
     hierarchy: {
       state: 'Odisha',
@@ -1525,29 +1557,26 @@ export async function getPlaceProfile(placeId: string): Promise<PlaceProfile> {
         ],
       },
     },
-  };
+  });
 }
 
 export async function checkHealth(): Promise<{ status: string; version: string; pilot_region: string }> {
-  try {
-    const res = await fetch(`${API_BASE}/health`);
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch {
-    // If /api/v1/health is not routed, try root /health
+  // Try /health first (canonical unversioned root probe),
+  // then try ${API_BASE}/health if an API gateway or proxy mounts it under the version prefix
+  const endpoints = ['/health', `${API_BASE}/health`];
+  for (const endpoint of endpoints) {
     try {
-      const rootRes = await fetch('/health');
-      if (rootRes.ok) {
-        const data = await rootRes.json();
+      const res = await fetch(endpoint);
+      if (res.ok) {
+        const data = await res.json();
         return {
           status: data.status || 'healthy',
           version: data.version || '1.0.0',
-          pilot_region: 'Khordha, Odisha',
+          pilot_region: data.pilot_region || 'Khordha, Odisha',
         };
       }
     } catch {
-      // offline
+      // Network connection error on this endpoint, attempt next endpoint
     }
   }
   throw new Error('Backend offline');

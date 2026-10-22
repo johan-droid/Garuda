@@ -5,7 +5,7 @@ census table have very different update rhythms, and a single TTL would
 either serve stale public-health information or re-fetch census data
 constantly.
 
-Limitations (documented in docs/runbooks/CACHING.md):
+Limitations (documented in docs/PRODUCTION.md):
   * The cache is per-process. With multiple API instances each instance keeps
     its own cache, so a change is visible on all instances only after the TTL
     expires.

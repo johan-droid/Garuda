@@ -28,10 +28,19 @@ REFERRER_POLICY = "strict-origin-when-cross-origin"
 X_CONTENT_TYPE_OPTIONS = "nosniff"
 X_FRAME_OPTIONS = "DENY"
 CROSS_ORIGIN_OPENER_POLICY = "same-origin"
-CROSS_ORIGIN_RESOURCE_POLICY = "same-site"
+CROSS_ORIGIN_RESOURCE_POLICY = "cross-origin"
 PERMISSIONS_POLICY = (
     "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), "
     "microphone=(), payment=(), usb=()"
+)
+
+DOCS_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
+    "frame-ancestors 'none'; "
+    "object-src 'none'"
 )
 
 
@@ -60,22 +69,25 @@ class SecurityHeadersMiddleware:
             await self.app(scope, receive, send)
             return
 
+        path = scope.get("path", "")
+
         async def send_wrapper(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = message.setdefault("headers", [])
-                self._apply(headers)
+                self._apply(headers, path=path)
             await send(message)
 
         await self.app(scope, receive, send_wrapper)
 
-    def _apply(self, headers: list[tuple[bytes, bytes]]) -> None:
+    def _apply(self, headers: list[tuple[bytes, bytes]], path: str = "") -> None:
         existing = {key.decode("latin-1").lower() for key, _ in headers}
 
         def add(name: str, value: str) -> None:
             if name.lower() not in existing:
                 headers.append((name.encode("latin-1"), value.encode("latin-1")))
 
-        add("Content-Security-Policy", build_csp())
+        csp = DOCS_CSP if path in ("/docs", "/redoc", "/openapi.json") else build_csp()
+        add("Content-Security-Policy", csp)
         add("X-Content-Type-Options", X_CONTENT_TYPE_OPTIONS)
         add("X-Frame-Options", X_FRAME_OPTIONS)
         add("Referrer-Policy", REFERRER_POLICY)

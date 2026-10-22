@@ -13,6 +13,7 @@ import {
   Place,
   SearchResult,
   PlaceProfile,
+  PanelResponse,
   HealthAlertsResponse,
   SourceDiagnostics,
 } from '../types/contracts';
@@ -232,7 +233,29 @@ export const HomePage: React.FC = () => {
   }, [profile]);
 
   const center: [number, number] = selectedPlace.coordinates || [20.1812, 85.6174];
-  const panels = profile?.panels || {};
+
+  // Helper to find observations matching any of several canonical/legacy field names
+  const findObs = (observations: any[] | undefined, ...fieldNames: string[]) => {
+    if (!observations) return undefined;
+    for (const name of fieldNames) {
+      const found = observations.find((o) => o.field_name === name);
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  const panels: Record<string, PanelResponse | undefined> = useMemo(() => {
+    const rawPanels = profile?.panels || {};
+    const culture = rawPanels.history_culture || rawPanels.culture;
+    const weather = rawPanels.weather_disasters || rawPanels.weather;
+    return {
+      ...rawPanels,
+      culture,
+      history_culture: culture,
+      weather,
+      weather_disasters: weather,
+    };
+  }, [profile]);
 
   return (
     <div className="app-container">
@@ -569,40 +592,53 @@ export const HomePage: React.FC = () => {
                   <div className="metrics-grid">
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.health.observations?.find(
-                          (o) => o.field_name === 'primary_health_centres'
-                        )?.value ??
-                          panels.health.observations?.find((o) => o.field_name === 'urban_phcs')
-                            ?.value ??
-                          'N/A'}
+                        {findObs(
+                          panels.health.observations,
+                          'primary_health_centres',
+                          'urban_phcs'
+                        )?.value ?? 'N/A'}
                       </div>
                       <div className="metric-label">Primary Health Centres (PHC)</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.health.observations?.find(
-                          (o) => o.field_name === 'community_health_centres'
-                        )?.value ??
-                          panels.health.observations?.find(
-                            (o) => o.field_name === 'tertiary_institutes'
-                          )?.value ??
-                          'N/A'}
+                        {findObs(
+                          panels.health.observations,
+                          'community_health_centres',
+                          'tertiary_institutes'
+                        )?.value ?? 'N/A'}
                       </div>
                       <div className="metric-label">Community Health (CHC)</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.health.observations?.find(
-                          (o) => o.field_name === 'surveillance_dengue_cases'
-                        )?.value ?? '0'}
+                        {findObs(
+                          panels.health.observations,
+                          'dengue_cases',
+                          'surveillance_dengue_cases'
+                        )?.value != null
+                          ? findObs(
+                              panels.health.observations,
+                              'dengue_cases',
+                              'surveillance_dengue_cases'
+                            )?.value
+                          : 'N/A'}
                       </div>
                       <div className="metric-label">Dengue Surveillance Cases</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.health.observations?.find(
-                          (o) => o.field_name === 'surveillance_cholera_cases'
-                        )?.value ?? '0'}
+                        {findObs(
+                          panels.health.observations,
+                          'cholera_cases',
+                          'surveillance_cholera_cases'
+                        )?.value != null
+                          ? findObs(
+                              panels.health.observations,
+                              'cholera_cases',
+                              'surveillance_cholera_cases'
+                            )?.value
+                          : 'N/A'}
                       </div>
                       <div className="metric-label">Cholera Sentinel Cases</div>
                     </div>
@@ -636,29 +672,37 @@ export const HomePage: React.FC = () => {
                   <div className="metrics-grid">
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.services.observations
-                          ?.find((o) => o.field_name === 'schools_count')
-                          ?.value?.toLocaleString() || 'N/A'}
+                        {findObs(
+                          panels.services.observations,
+                          'schools_total',
+                          'schools_count'
+                        )?.value?.toLocaleString() || 'N/A'}
                       </div>
                       <div className="metric-label">Primary & Secondary Schools</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.services.observations?.find(
-                          (o) => o.field_name === 'drinking_water_coverage'
-                        )?.value != null
-                          ? `${panels.services.observations.find((o) => o.field_name === 'drinking_water_coverage')?.value}%`
-                          : 'N/A'}
+                        {(() => {
+                          const obs = findObs(
+                            panels.services.observations,
+                            'drinking_water_access_pct',
+                            'drinking_water_coverage'
+                          );
+                          return obs?.value != null ? `${obs.value}%` : 'N/A';
+                        })()}
                       </div>
                       <div className="metric-label">Drinking Water Coverage</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.services.observations?.find(
-                          (o) => o.field_name === 'electrification_coverage'
-                        )?.value != null
-                          ? `${panels.services.observations.find((o) => o.field_name === 'electrification_coverage')?.value}%`
-                          : 'N/A'}
+                        {(() => {
+                          const obs = findObs(
+                            panels.services.observations,
+                            'electrification_pct',
+                            'electrification_coverage'
+                          );
+                          return obs?.value != null ? `${obs.value}%` : 'N/A';
+                        })()}
                       </div>
                       <div className="metric-label">Electrification Coverage</div>
                     </div>
@@ -674,31 +718,37 @@ export const HomePage: React.FC = () => {
               )}
 
               {/* History & Culture Panel */}
-              {panels.culture && (
+              {panels.culture && panels.culture.status !== 'unavailable' && (
                 <div className="card">
                   <div className="card-title">
                     <span>History & Heritage Sites</span>
                     <span className="badge badge-verified">ASI Citations</span>
                   </div>
                   <div className="culture-list">
-                    {panels.culture.observations?.map((item, idx) => (
-                      <div key={idx} className="culture-item">
-                        <div className="culture-title">
-                          🏛️ {item.value}
-                          {item.monument_id && (
-                            <span className="badge badge-pilot" style={{ marginLeft: '8px' }}>
-                              {item.monument_id}
-                            </span>
+                    {panels.culture.observations && panels.culture.observations.length > 0 ? (
+                      panels.culture.observations.map((item, idx) => (
+                        <div key={idx} className="culture-item">
+                          <div className="culture-title">
+                            🏛️ {item.value}
+                            {item.monument_id && (
+                              <span className="badge badge-pilot" style={{ marginLeft: '8px' }}>
+                                {item.monument_id}
+                              </span>
+                            )}
+                          </div>
+                          {item.historical_period && (
+                            <div className="culture-period">Period: {item.historical_period}</div>
+                          )}
+                          {(item.citation || item.notes) && (
+                            <div className="culture-citation">{item.citation || item.notes}</div>
                           )}
                         </div>
-                        {item.historical_period && (
-                          <div className="culture-period">Period: {item.historical_period}</div>
-                        )}
-                        {item.citation && (
-                          <div className="culture-citation">{item.citation}</div>
-                        )}
+                      ))
+                    ) : (
+                      <div className="culture-item" style={{ fontStyle: 'italic', color: '#64748b' }}>
+                        No centrally protected heritage sites catalogued for this boundary in current ASI register.
                       </div>
-                    ))}
+                    )}
                   </div>
                   <div className="provenance-tag">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -719,27 +769,36 @@ export const HomePage: React.FC = () => {
                   <div className="metrics-grid">
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.environment.observations?.find((o) => o.field_name === 'forest_cover')
-                          ?.value != null
-                          ? `${panels.environment.observations.find((o) => o.field_name === 'forest_cover')?.value}%`
-                          : 'N/A'}
+                        {(() => {
+                          const obs = findObs(
+                            panels.environment.observations,
+                            'forest_cover_pct',
+                            'forest_cover'
+                          );
+                          return obs?.value != null ? `${obs.value}%` : 'N/A';
+                        })()}
                       </div>
                       <div className="metric-label">Forest Cover % (FSI)</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.environment.observations?.find(
-                          (o) => o.field_name === 'chilika_water_spread'
-                        )?.value != null
-                          ? `${panels.environment.observations.find((o) => o.field_name === 'chilika_water_spread')?.value} km²`
-                          : 'N/A'}
+                        {(() => {
+                          const obs = findObs(
+                            panels.environment.observations,
+                            'chilika_water_spread_area_sq_km',
+                            'chilika_water_spread'
+                          );
+                          return obs?.value != null ? `${obs.value} km²` : 'N/A';
+                        })()}
                       </div>
                       <div className="metric-label">Chilika Water Spread</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.environment.observations?.find(
-                          (o) => o.field_name === 'air_quality_index'
+                        {findObs(
+                          panels.environment.observations,
+                          'air_quality_index_baseline',
+                          'air_quality_index'
                         )?.value ?? 'N/A'}
                       </div>
                       <div className="metric-label">Air Quality Index (AQI)</div>
@@ -815,38 +874,73 @@ export const HomePage: React.FC = () => {
                   <div className="metrics-grid">
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.weather.observations?.find((o) => o.field_name === 'temperature')
-                          ?.value ?? 'N/A'}
+                        {findObs(
+                          panels.weather.observations,
+                          'surface_temperature_celsius',
+                          'temperature'
+                        )?.value ?? 'N/A'}
                         °C
                       </div>
                       <div className="metric-label">Temperature</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.weather.observations?.find((o) => o.field_name === 'humidity')
-                          ?.value ?? 'N/A'}
-                        %
+                        {(() => {
+                          const rainfall = findObs(
+                            panels.weather.observations,
+                            'rainfall_daily_mm',
+                            'precipitation'
+                          );
+                          if (rainfall?.value != null) return `${rainfall.value} mm`;
+                          const hum = findObs(panels.weather.observations, 'humidity');
+                          return hum?.value != null ? `${hum.value}%` : 'N/A';
+                        })()}
                       </div>
-                      <div className="metric-label">Relative Humidity</div>
+                      <div className="metric-label">
+                        {findObs(
+                          panels.weather.observations,
+                          'rainfall_daily_mm',
+                          'precipitation'
+                        )
+                          ? '24h Precipitation'
+                          : 'Relative Humidity'}
+                      </div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.weather.observations?.find((o) => o.field_name === 'wind_speed')
-                          ?.value ?? 'N/A'}{' '}
-                        km/h
+                        {findObs(panels.weather.observations, 'wind_speed')?.value != null
+                          ? `${findObs(panels.weather.observations, 'wind_speed')?.value} km/h`
+                          : 'N/A'}
                       </div>
                       <div className="metric-label">Wind Speed</div>
                     </div>
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {panels.weather.observations?.find(
-                          (o) => o.field_name === 'barometric_pressure'
-                        )?.value ?? 'N/A'}{' '}
-                        hPa
+                        {findObs(panels.weather.observations, 'barometric_pressure')?.value != null
+                          ? `${findObs(panels.weather.observations, 'barometric_pressure')?.value} hPa`
+                          : 'N/A'}
                       </div>
                       <div className="metric-label">Barometric Pressure</div>
                     </div>
                   </div>
+
+                  {/* Weather / Disaster Preparedness Advisory */}
+                  {(() => {
+                    const advisory = findObs(
+                      panels.weather.observations,
+                      'cyclone_preparedness_advisory'
+                    );
+                    if (!advisory?.value) return null;
+                    return (
+                      <div
+                        className="health-disclaimer-box"
+                        style={{ marginTop: '12px', borderLeftColor: '#f59e0b' }}
+                      >
+                        ⚠️ <strong>Disaster Preparedness Notice:</strong> {advisory.value}
+                      </div>
+                    );
+                  })()}
+
                   <div className="provenance-tag">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
@@ -857,12 +951,17 @@ export const HomePage: React.FC = () => {
               )}
 
               {/* Explicit Missing Data / Unavailable Domains Section */}
-              {Object.entries(panels)
-                .filter(([, p]) => p.status === 'unavailable')
+              {(Object.entries(panels) as [string, PanelResponse | undefined][])
+                .filter((entry): entry is [string, PanelResponse] => {
+                  const [dKey, p] = entry;
+                  return Boolean(
+                    p && p.status === 'unavailable' && dKey !== 'culture' && dKey !== 'weather'
+                  );
+                })
                 .map(([dKey, p]) => (
                   <div key={dKey} className="card card-unavailable">
                     <div className="card-title">
-                      <span>{dKey.toUpperCase()} — DATA UNAVAILABLE</span>
+                      <span>{dKey.replace(/_/g, ' ').toUpperCase()} — DATA UNAVAILABLE</span>
                       <span className="badge badge-unavail">UNAVAILABLE</span>
                     </div>
                     <div className="data-gaps-explanation">
