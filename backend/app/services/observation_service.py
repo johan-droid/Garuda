@@ -44,8 +44,9 @@ def list_observations(
     asking for "2026 data" must not return undated rows.
 
     `include_stale=False` drops observations whose recomputed status is
-    `stale`. The default keeps them, because the response carries the status
-    so the caller can decide how to present them.
+    `stale`. When `include_stale=False`, total reflects the count of non-stale
+    observations, and pagination (offset/limit) is applied after filtering
+    stale records so page sizes and total counts are consistent.
     """
     if len(place_id) > settings.MAX_ID_LENGTH:
         return [], 0
@@ -63,6 +64,30 @@ def list_observations(
         conditions.append(ObservationModel.reference_period_start.is_not(None))
         conditions.append(ObservationModel.reference_period_start <= period_end)
 
+    now = datetime.now(UTC)
+
+    if not include_stale:
+        all_rows = list(
+            session.scalars(
+                select(ObservationModel)
+                .where(*conditions)
+                .order_by(ObservationModel.field_name, ObservationModel.id)
+            )
+        )
+        non_stale: list[Observation] = []
+        for row in all_rows:
+            obs: Observation
+            if row.domain == DOMAIN_HEALTH:
+                obs = to_health_observation(row, now)
+            else:
+                obs = to_observation(row)
+            obs.quality_status = determine_status(obs, now)
+            if obs.quality_status != DataStatus.STALE:
+                non_stale.append(obs)
+
+        total = len(non_stale)
+        return non_stale[offset : offset + limit], total
+
     total = session.scalar(select(func.count()).select_from(ObservationModel).where(*conditions)) or 0
 
     rows = list(
@@ -75,7 +100,6 @@ def list_observations(
         )
     )
 
-    now = datetime.now(UTC)
     observations: list[Observation] = []
     for row in rows:
         if row.domain == DOMAIN_HEALTH:
@@ -86,13 +110,6 @@ def list_observations(
     # Recompute status at read time so the age of the data is judged now.
     for observation in observations:
         observation.quality_status = determine_status(observation, now)
-
-    if not include_stale:
-        observations = [
-            observation
-            for observation in observations
-            if observation.quality_status != DataStatus.STALE
-        ]
 
     return observations, total
 

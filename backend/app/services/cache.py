@@ -29,6 +29,8 @@ CATEGORY_TTL_SECONDS: dict[str, int] = {
     "infrastructure": settings.CACHE_TTL_FACILITIES_SECONDS,
     "environment": settings.CACHE_TTL_FACILITIES_SECONDS,
     "resilience": settings.CACHE_TTL_FACILITIES_SECONDS,
+    "history_culture": settings.CACHE_TTL_DEMOGRAPHICS_SECONDS,
+    "weather_disasters": 1_800,
     "health": settings.CACHE_TTL_HEALTH_ADVISORY_SECONDS,
     "health_outbreak": settings.CACHE_TTL_HEALTH_OUTBREAK_SECONDS,
     "place_lookup": settings.CACHE_TTL_PLACE_LOOKUP_SECONDS,

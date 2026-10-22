@@ -74,13 +74,15 @@ User=garuda
 WorkingDirectory=/opt/garuda/backend
 Environment="PATH=/opt/garuda/.venv/bin:/usr/local/bin:/usr/bin"
 EnvironmentFile=/opt/garuda/.env
-ExecStart=/opt/garuda/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+ExecStart=/opt/garuda/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+> **Note on Worker Concurrency:** `--workers 1` is explicitly configured to prevent split in-process rate limiting and cache divergence. Garuda relies on process-local token-bucket rate limiters and in-memory LRU caches; process-local rate limiting and cache require a single worker per host unless using a centralized store (such as Redis).
 
 Enable and start backend:
 ```bash
@@ -170,21 +172,36 @@ PRAGMA busy_timeout=5000;
 This enables concurrent reads without blocking writes and prevents database locking.
 
 ### Hot Backup Runbook (Zero Downtime)
-SQLite WAL mode allows hot backups while the service is actively serving traffic:
+SQLite WAL mode allows hot backups while the service is actively serving traffic. Garuda provides a standalone Python backup utility (`backend/tools/backup_db.py`) that executes 100% via the Python standard library, eliminating reliance on the external OS `sqlite3` CLI:
+
+- **Atomic Hot Backup**: Uses `sqlite3.Connection.backup(dest_conn)` for lock-free hot backups while active read/write transactions occur.
+- **Integrity Verification**: Executes `PRAGMA integrity_check` on the backed-up file before compression to verify zero database corruption.
+- **Compression**: Compresses the verified backup to `.gz` format using standard library `gzip` (level 9) and maintains a `garuda_local_latest.db.gz` symlink.
+- **Configurable Paths**: Accepts `--db-path` (defaults to `settings.DATABASE_URL` path) and `--output-dir` (defaults to `backups/`).
+
+#### Invocation
+
+Run from the `backend/` directory or with `PYTHONPATH=backend`:
+
+```bash
+# Default invocation (backs up settings.DATABASE_URL to backups/)
+PYTHONPATH=backend python3 -m tools.backup_db
+
+# Custom database path and destination directory
+PYTHONPATH=backend python3 -m tools.backup_db --db-path /opt/garuda/garuda_local.db --output-dir /var/backups/garuda
+```
+
+#### Automated Production Cron / Systemd Timer
+To automate daily hot backups and retain 14 days of history:
 
 ```bash
 #!/bin/bash
 # /opt/scripts/backup_garuda.sh
 BACKUP_DIR="/var/backups/garuda"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-mkdir -p "$BACKUP_DIR"
+cd /opt/garuda/backend
+PYTHONPATH=. /opt/garuda/.venv/bin/python3 -m tools.backup_db --output-dir "$BACKUP_DIR"
 
-# Perform atomic hot backup
-sqlite3 garuda_local.db ".backup '$BACKUP_DIR/garuda_$TIMESTAMP.db'"
-
-# Compress and keep 14 days of backups
-gzip "$BACKUP_DIR/garuda_$TIMESTAMP.db"
-ln -sf "$BACKUP_DIR/garuda_$TIMESTAMP.db.gz" "$BACKUP_DIR/garuda_latest.db.gz"
+# Retain 14 days of compressed archives
 find "$BACKUP_DIR" -type f -name "*.db.gz" -mtime +14 -delete
 ```
 

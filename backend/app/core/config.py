@@ -10,7 +10,9 @@ Security notes:
 """
 
 from functools import lru_cache
-from typing import List, Optional
+import json
+from pathlib import Path
+from typing import Any, List, Optional, Union
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,10 +20,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Sentinel used to detect "not configured". Deliberately not a usable secret.
 _UNSET = "unset"
 
+# Default SQLite database path anchored to the project root directory
+# (garuda/backend/app/core/config.py -> parents[3] == garuda/)
+_DEFAULT_SQLITE_PATH = (Path(__file__).resolve().parents[3] / "garuda_local.db").resolve()
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(str(_DEFAULT_SQLITE_PATH.parent / ".env"), ".env"),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
@@ -63,7 +69,7 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = Field(
-        default="sqlite:///./garuda_local.db",
+        default=f"sqlite:///{_DEFAULT_SQLITE_PATH}",
         validation_alias=AliasChoices("DATABASE_URL", "GARUDA_DATABASE_URL"),
         description="Database connection URL. SQLite for zero-cost dev/testing, PostgreSQL for production",
     )
@@ -74,7 +80,7 @@ class Settings(BaseSettings):
     DB_ENABLE_SQLITE_FK: bool = Field(default=True, description="Enable foreign key enforcement on SQLite")
 
     # CORS & Security
-    ALLOWED_ORIGINS: List[str] = Field(
+    ALLOWED_ORIGINS: Union[List[str], str] = Field(
         validation_alias=AliasChoices("ALLOWED_ORIGINS", "CORS_ORIGINS", "GARUDA_ALLOWED_ORIGINS"),
         default=[
             "http://localhost:3000",
@@ -145,6 +151,16 @@ class Settings(BaseSettings):
         description="Allow outbound requests to private/loopback IPs. Development only.",
     )
     INGEST_MAX_ROWS: int = Field(default=50_000, description="Max rows accepted in a single import batch")
+    IMD_API_BASE_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("IMD_API_BASE_URL", "GARUDA_IMD_API_BASE_URL"),
+        description="Base URL for IMD weather upstream API. Live calls disabled when unset.",
+    )
+    NHM_API_BASE_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("NHM_API_BASE_URL", "GARUDA_NHM_API_BASE_URL"),
+        description="Base URL for NHM health upstream API. Live calls disabled when unset.",
+    )
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO", description="Minimum log level")
@@ -174,6 +190,40 @@ class Settings(BaseSettings):
         if level not in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"}:
             raise ValueError("LOG_LEVEL must be a standard level name")
         return level
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> Any:
+        """Accept JSON array string, comma-separated string, or list for CORS origins."""
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return []
+            if s.startswith("[") and s.endswith("]"):
+                try:
+                    parsed = json.loads(s)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except json.JSONDecodeError:
+                    pass
+                try:
+                    parsed = json.loads(s.replace("'", '"'))
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except json.JSONDecodeError:
+                    pass
+            return [item.strip() for item in s.split(",") if item.strip()]
+        elif isinstance(v, (list, tuple)):
+            return [str(item).strip() for item in v if str(item).strip()]
+        return v
+
+    @field_validator("DATABASE_URL")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """Anchor relative default SQLite URL to project root database."""
+        if v in ("sqlite:///./garuda_local.db", "sqlite:///garuda_local.db"):
+            return f"sqlite:///{_DEFAULT_SQLITE_PATH}"
+        return v
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
