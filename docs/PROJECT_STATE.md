@@ -8,7 +8,8 @@
 | Field | Value |
 |:---|:---|
 | **Last updated** | 2026-10-23 |
-| **Describes** | The tree after `9d3ad36`, plus this document |
+| **Describes** | The tree after `0eeb7df` (docs-state audit + migration-test fix), plus this document |
+| **HEAD** | `0eeb7df docs: add project state guide so contributors and agents start from facts` |
 | **Pilot region** | Khordha District, Odisha, India (`IN-OD-29`) |
 | **Maturity** | Working pilot on seeded data. No live public dataset is ingested yet. |
 | **Spend** | ₹0. Every dependency and endpoint in the default path is anonymous and keyless. |
@@ -34,7 +35,7 @@ Backend serves the contract; frontend renders it; the seed database holds the pi
 | **Database** | SQLite by default (`garuda_local.db`, gitignored), Postgres supported by configuration |
 | **Routes** | 19 endpoints across 5 routers (`places`, `observations`, `sources`, `admin`, `health`) |
 | **Pilot data** | 10 places, 19 aliases, 7 sources, 103 observations across 8 domains |
-| **Tests** | 103 backend (`pytest`), 4 frontend (`vitest`), 20 imagery (+4 skipped network tests) |
+| **Tests** | 103 backend (`pytest`, incl. 2 alembic migration tests), 4 frontend (`vitest`), 20 imagery (+4 skipped network tests); `mypy backend/app` clean (38 files) |
 | **Static checks** | `mypy backend/app` clean (38 files), `tsc --noEmit` clean, `vite build` succeeds |
 | **CI** | None yet — `.github/` is empty; all checks below are run locally |
 

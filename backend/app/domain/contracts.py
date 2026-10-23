@@ -1,6 +1,7 @@
 """Place, source, and observation contract models (Pydantic v2)."""
 
 from datetime import UTC, date, datetime
+from enum import Enum
 from typing import Any, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, field_validator
@@ -13,6 +14,7 @@ from app.domain.common import (
     PlaceType,
     VerificationStatus,
 )
+from enum import Enum
 
 
 def utcnow() -> datetime:
@@ -100,6 +102,11 @@ class Observation(BaseModel):
             "dated source from an undated fixture."
         ),
     )
+    # Optional extended metadata for later extended observation types.
+    satellite_mission: str | None = Field(default=None, max_length=255)
+    resolution_meters: float | None = Field(default=None, description="Nominal spatial resolution of the observation in metres.")
+    cloud_cover_percentage: float | None = Field(default=None, description="Scene-level or aggregate cloud fraction where relevant.")
+    scene_timestamp: str | None = Field(default=None, description="ISO 8601 timestamp for imagery acquisition.")
 
 
 class HealthObservation(Observation):
@@ -235,6 +242,40 @@ class DataStatusSummary(BaseModel):
     message: str | None = None
 
 
+class GetLatestObservationStatus(str, Enum):
+    """Status for the latest available observation endpoint."""
+
+    CURRENT = "current"
+    RELUCTANT = "reluctant"
+    UNAVAILABLE = "unavailable"
+
+
+class LatestObservationResponse(BaseModel):
+    """Response envelope for a single latest-observation endpoint."""
+
+    place: Place
+    field_name: str
+    status: GetLatestObservationStatus
+    observation: Observation | None = None
+    unavailable_reason: str | None = None
+    retrieved_at: datetime = Field(default_factory=utcnow)
+    coverage_note: str | None = None
+    data_gaps: list[str] = Field(default_factory=list)
+
+
+class LatestObservationResponse(BaseModel):
+    """Response envelope for a single latest-observation endpoint."""
+
+    place: Place
+    field_name: str
+    status: GetLatestObservationStatus
+    observation: Observation | None = None
+    unavailable_reason: str | None = None
+    retrieved_at: datetime = Field(default_factory=utcnow)
+    coverage_note: str | None = None
+    data_gaps: list[str] = Field(default_factory=list)
+
+
 class ApiError(BaseModel):
     """Uniform error envelope returned by the API."""
 
@@ -243,6 +284,14 @@ class ApiError(BaseModel):
     status: int
     request_id: str | None = None
     details: Any | None = None
+
+
+class GetLatestObservationStatus(str, Enum):
+    """Status for the latest available observation endpoint."""
+
+    CURRENT = "current"
+    RELUCTANT = "reluctant"
+    UNAVAILABLE = "unavailable"
 
 
 class ReverseGeocodeResponse(BaseModel):

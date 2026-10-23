@@ -38,6 +38,8 @@ from app.domain.contracts import PlaceProfile, ReverseGeocodeResponse, SearchRes
 from app.services import observation_service
 from app.services.boundary_service import get_boundaries_feature_collection, reverse_geocode
 from app.services.place_service import get_place, get_profile, search_places
+from app.api.routes import environment_scenes as env_scenes
+from app.domain.contracts import GetLatestObservationStatus
 
 router = APIRouter(prefix="/places", tags=["places"])
 
@@ -138,6 +140,36 @@ def profile(place_id: PlaceIdPath, session: SessionDep, response: Response) -> P
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Place not found.")
     response.headers["Cache-Control"] = "no-store"
+
+
+@router.get(
+    "/{place_id}/environment-scenes",
+    response_model=env_scenes.LatestObservationResponse,
+    summary="Latest available Sentinel-2 scene metadata for a place",
+)
+def environment_scenes(
+    place_id: PlaceIdPath,
+    session: SessionDep,
+    response: Response,
+    raise_on_error: Annotated[bool, Query(description="If true, propagate provider errors to the client.")] = False,
+) -> env_scenes.LatestObservationResponse:
+    """Return imagery metadata for the latest available Sentinel-2 L2A scene covering the place.
+
+    This endpoint returns a single scene observation from the Earth Search STAC
+    public catalog, not imagery pixels. The scene's acquisition date, cloud
+    fraction, and source are returned with explicit provenance.
+
+    The client must use `status` to distinguish a reported observation from an
+    unavailable or reluctant response. A successful HTTP 200 does not mean the
+    returned scene is current.
+
+    Because this answers a specific location query, it is marked `no-store`.
+    """
+    result = env_scenes.get_latest_sentinel2_scene(session, place_id, raise_on_error=raise_on_error)
+    response.headers["Cache-Control"] = "no-store"
+    if result.status == env_scenes.GetLatestObservationStatus.UNAVAILABLE:
+        response.headers["Cache-Control"] = "no-store"
+    return result
     return result
 
 

@@ -22,7 +22,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, observations, places, sources
+from app.api.routes import admin, environment_scenes, observations, places, sources
 from app.api.routes.health import router as health_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
@@ -102,6 +102,7 @@ def create_app() -> FastAPI:
     # Versioned API.
     app.include_router(places.router, prefix=settings.API_V1_STR)
     app.include_router(sources.router, prefix=settings.API_V1_STR)
+    app.include_router(environment_scenes.router, prefix=settings.API_V1_STR)
     app.include_router(observations.router, prefix=settings.API_V1_STR)
     app.include_router(admin.router, prefix=settings.API_V1_STR)
 

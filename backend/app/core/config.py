@@ -134,10 +134,16 @@ class Settings(BaseSettings):
     CACHE_TTL_HEALTH_ADVISORY_SECONDS: int = Field(default=900, description="Health advisory TTL (15 minutes)")
     CACHE_TTL_HEALTH_OUTBREAK_SECONDS: int = Field(default=300, description="Health outbreak TTL (5 minutes)")
     CACHE_TTL_PLACE_LOOKUP_SECONDS: int = Field(default=604_800, description="Place/geography lookup TTL (7 days)")
+    CACHE_TTL_ENVIRONMENT_SECONDS: int = Field(default=900, description="Environment imagery metadata TTL (15 minutes)")
     CACHE_MAX_ENTRIES: int = Field(default=2048, description="Max in-memory cache entries before eviction")
 
     # Upstream & Ingestion Safety
     UPSTREAM_TIMEOUT_SECONDS: int = Field(default=15, description="Timeout for external API calls")
+    EARTH_SEARCH_STAC_ENDPOINT: str = Field(
+        default="https://earth-search.aws.element84.com/v1",
+        validation_alias=AliasChoices("EARTH_SEARCH_STAC_ENDPOINT", "GARUDA_EARTH_SEARCH_STAC_ENDPOINT"),
+        description="Earth Search STAC public endpoint for Sentinel-2 L2A scene metadata.",
+    )
     UPSTREAM_MAX_RETRIES: int = Field(default=3, description="Max retries for transient upstream failures")
     UPSTREAM_BACKOFF_BASE_SECONDS: float = Field(default=0.5, description="Base for exponential backoff")
     UPSTREAM_BACKOFF_MAX_SECONDS: float = Field(default=8.0, description="Max backoff delay")

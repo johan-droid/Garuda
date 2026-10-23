@@ -78,6 +78,7 @@ def get_source_ttl_seconds(source_id: str) -> int:
         "src-mohfw-nhm": settings.CACHE_TTL_FACILITIES_SECONDS,
         "src-idsp-ncdc": settings.CACHE_TTL_HEALTH_OUTBREAK_SECONDS,
         "src-udise-plus": settings.CACHE_TTL_FACILITIES_SECONDS,
+        "src-esa-sentinel-stac": settings.CACHE_TTL_ENVIRONMENT_SECONDS,
         "src-asi": settings.CACHE_TTL_PLACE_LOOKUP_SECONDS,
         "src-imd": 1800,
         "src-isro-bhuvan": 86400,

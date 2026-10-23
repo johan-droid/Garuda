@@ -2,6 +2,7 @@
 
 from app.services.provider_adapters import (
     BaseProviderAdapter,
+    EarthSearchSentinelAdapter,
     IMDWeatherAdapter,
     NHMHealthAdapter,
     ProviderConfigurationError,
@@ -11,6 +12,7 @@ from app.services.provider_adapters import (
 
 __all__ = [
     "BaseProviderAdapter",
+    "EarthSearchSentinelAdapter",
     "IMDWeatherAdapter",
     "NHMHealthAdapter",
     "ProviderError",

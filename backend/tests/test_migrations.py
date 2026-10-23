@@ -7,9 +7,10 @@ from alembic.script import ScriptDirectory
 
 
 def test_alembic_heads_single_head() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[1]
     ini_path = repo_root / "alembic.ini"
     cfg = Config(str(ini_path))
+    cfg.set_main_option("script_location", str(repo_root / "alembic"))
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
     assert len(heads) == 1
@@ -17,11 +18,12 @@ def test_alembic_heads_single_head() -> None:
 
 
 def test_alembic_migration_upgrade_and_downgrade(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[1]
     ini_path = repo_root / "alembic.ini"
     test_db = tmp_path / "test_migration.db"
 
     cfg = Config(str(ini_path))
+    cfg.set_main_option("script_location", str(repo_root / "alembic"))
     cfg.set_main_option("sqlalchemy.url", f"sqlite:///{test_db}")
 
     # Upgrade to head
