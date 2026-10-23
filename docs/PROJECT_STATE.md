@@ -7,9 +7,9 @@
 
 | Field | Value |
 |:---|:---|
-| **Last updated** | 2026-10-23 |
-| **Describes** | The tree after `0eeb7df` (docs-state audit + migration-test fix), plus this document |
-| **HEAD** | `0eeb7df docs: add project state guide so contributors and agents start from facts` |
+| **Last updated** | 2026-10-24 |
+| **Describes** | The tree after end-to-end audit, gap closure, and regression verification |
+| **HEAD** | `bcf0602 feat: add environment scenes endpoint for latest Sentinel-2 observation metadata` |
 | **Pilot region** | Khordha District, Odisha, India (`IN-OD-29`) |
 | **Maturity** | Working pilot on seeded data. No live public dataset is ingested yet. |
 | **Spend** | ₹0. Every dependency and endpoint in the default path is anonymous and keyless. |
@@ -33,10 +33,10 @@ Backend serves the contract; frontend renders it; the seed database holds the pi
 |:---|:---|
 | **Stack** | FastAPI (Python 3.12) + SQLAlchemy 2.0 + Alembic (1 migration); React 18 + TypeScript 5.6 + Vite 5; MapLibre GL 4 (2D map); CesiumJS 1.146 (opt-in 3D globe at `/?globe=1`) |
 | **Database** | SQLite by default (`garuda_local.db`, gitignored), Postgres supported by configuration |
-| **Routes** | 19 endpoints across 5 routers (`places`, `observations`, `sources`, `admin`, `health`) |
+| **Routes** | 20 endpoints across 6 routers (`places`, `environment_scenes`, `observations`, `sources`, `admin`, `health`) |
 | **Pilot data** | 10 places, 19 aliases, 7 sources, 103 observations across 8 domains |
-| **Tests** | 103 backend (`pytest`, incl. 2 alembic migration tests), 4 frontend (`vitest`), 20 imagery (+4 skipped network tests); `mypy backend/app` clean (38 files) |
-| **Static checks** | `mypy backend/app` clean (38 files), `tsc --noEmit` clean, `vite build` succeeds |
+| **Tests** | 109 backend (`pytest`, incl. 2 alembic migration tests, 6 environment-scenes tests), 12 frontend (`vitest`), 20 imagery (+4 skipped network tests); `mypy backend/app` clean (39 files) |
+| **Static checks** | `mypy backend/app` clean (39 files), `tsc --noEmit` clean, `vite build` succeeds |
 | **CI** | None yet — `.github/` is empty; all checks below are run locally |
 
 ---
@@ -99,11 +99,11 @@ should start from §5, not from the pre-`9d3ad36` behaviour.
 | Profile panels and statuses | **Real mechanism** | Status derives from `freshness.determine_status`; 8 domains; empty panels are `unavailable` with `data_gaps`. |
 | Demographics (Census 2011) | **Reference-dated, unverified provenance link** | Rows carry `reference_period_end` and render as `historical`; `source_url` is not populated (0 of 103), so the app cannot link to the record it cites. |
 | Health, services, infrastructure, environment, resilience, history, weather | **Fixture** | 43 of 103 observations carry no reference period and are therefore `unverified`; they render behind that badge, never as current measurements. |
-| Health alerts | **Real endpoint, empty data** | `/places/{id}/alerts` filters by validity window and category; no bulletin has been ingested. |
+| Health alerts | **Real endpoint, empty data** | `/places/{id}/alerts` filters by validity window and category; no bulletin has been ingested. Mock fallback in `client.ts` removed to prevent synthetic advisory display. |
 | Satellite imagery on the globe | **Real tiles, no acquisition date** | GIBS (anonymous, CORS `*`), OpenFreeMap basemap, Mapterhorn terrain. The UI does not yet print the imagery date. |
-| Sentinel-2 mosaic pipeline | **Works, offline-tested** | `tools/imagery/build_composite.py`, region `odisha-test`, manifest records scene id/date/cloud. Not wired into the UI. |
-| Frontend data honesty | **Real and tested** | 4 component tests: coverage notice (both branches), not-available card, status badges. |
-| Provider integration | **None** | Zero live datasets ingested. `provider_adapters.py` is parsing only. |
+| Sentinel-2 mosaic pipeline | **Works, offline-tested** | `tools/imagery/build_composite.py`, region `odisha-test`, manifest records scene id/date/cloud. Metadata query wired into UI via `/places/{id}/environment-scenes`. |
+| Frontend data honesty | **Real and tested** | 12 component and unit tests: coverage notice, not-available card, status badges, satellite scene metadata, temperature unit honesty, and health alerts honesty. |
+| Provider integration | **Tested metadata parser** | STAC and weather/health parsers; `provider_adapters.py` with verified SSRF guardrails, 5xx retries, and timeout hierarchy. |
 
 ### Provider verdicts (probed 2026-10-23, no credentials)
 
@@ -227,10 +227,10 @@ right; the last two rows are what prove it.
 
 | Command | Proves | Today |
 |:---|:---|:---|
-| `make test` | Backend unit, contract and integration behaviour | 103 passed |
-| `make test-frontend` | UI honesty states (coverage, not-available, badges) | 4 passed |
+| `make test` | Backend unit, contract and integration behaviour | 109 passed |
+| `make test-frontend` | UI honesty states (coverage, not-available, badges, scenes, alerts) | 12 passed |
 | `make test-imagery` | Sentinel-2 pipeline offline | 20 passed, 4 skipped |
-| `make lint` | Backend type safety | clean (38 files) |
+| `make lint` | Backend type safety | clean (39 files) |
 | `make build` | TypeScript + production bundle | succeeds |
 | `make dev` | Both servers on 8000 / 5173 | see §12 |
 | `curl` the endpoint | The JSON a user actually receives | required for API/UI changes |

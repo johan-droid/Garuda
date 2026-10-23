@@ -28,6 +28,7 @@ vi.mock('../api/client', async (importOriginal) => {
     searchPlaces: vi.fn(),
     getPlaceProfile: vi.fn(),
     getHealthAlerts: vi.fn(),
+    getEnvironmentScenes: vi.fn(),
     reverseGeocodeWithProvenance: vi.fn(),
     getSourceDiagnostics: vi.fn(),
   };
@@ -110,6 +111,7 @@ beforeEach(() => {
     expired_count: 0,
     source_count: 0,
   });
+  vi.mocked(api.getEnvironmentScenes).mockResolvedValue(null);
 });
 
 describe('coverage notice', () => {
@@ -194,5 +196,61 @@ describe('panel status badges', () => {
 
     // A panel with no reference period must not gain a year it does not have.
     expect(screen.queryByText('Unavailable (2011)')).toBeNull();
+  });
+});
+
+describe('sentinel-2 scene metadata & weather formatting', () => {
+  it('renders satellite scene metadata when environment scene is available', async () => {
+    vi.mocked(api.getPlaceProfile).mockResolvedValue(
+      profile({
+        environment: { domain: 'environment', status: 'current', observations: [] },
+      }),
+    );
+    vi.mocked(api.getEnvironmentScenes).mockResolvedValue({
+      place: khordha,
+      field_name: 'latest_sentinel2_scene',
+      status: 'current',
+      observation: {
+        field_name: 'latest_sentinel2_scene',
+        value: 'S2B_45QUC_20260205_0_L2A',
+        place_id: khordha.id,
+        source_id: 'src-esa-sentinel-stac',
+        quality_status: 'current',
+        retrieved_at: '2026-10-23T00:00:00Z',
+        satellite_mission: 'Sentinel-2 (ESA/Copernicus)',
+        resolution_meters: 10,
+        cloud_cover_percentage: 0.29,
+        scene_timestamp: '2026-02-05T05:02:58Z',
+      },
+    });
+
+    renderPage();
+
+    const title = await screen.findByText('🛰️ Sentinel-2 Satellite Scene Metadata');
+    expect(title).not.toBeNull();
+    expect(screen.getByText('Sentinel-2 (ESA/Copernicus)')).not.toBeNull();
+    expect(screen.getByText('0.29%')).not.toBeNull();
+    expect(screen.getByText('10m')).not.toBeNull();
+  });
+
+  it('renders clean N/A without orphan degree celsius when temperature is unavailable', async () => {
+    vi.mocked(api.getPlaceProfile).mockResolvedValue(
+      profile({
+        weather_disasters: {
+          domain: 'weather_disasters',
+          status: 'current',
+          observations: [],
+        },
+      }),
+    );
+
+    renderPage();
+
+    const tempLabel = await screen.findByText('Temperature');
+    const cell = tempLabel.closest('.metric-cell');
+    expect(cell).not.toBeNull();
+    // It should render "N/A" and NOT "N/A °C"
+    expect(cell?.textContent).toContain('N/A');
+    expect(cell?.textContent).not.toContain('N/A °C');
   });
 });

@@ -7,6 +7,7 @@ import {
   SourceDiagnostics,
   HealthAlertsResponse,
   Place,
+  LatestObservationResponse,
 } from '../types/contracts';
 
 const API_BASE = '/api/v1';
@@ -1279,56 +1280,6 @@ const MOCK_DIAGNOSTICS: SourceDiagnostics = {
   ],
 };
 
-// Health alerts fallback
-const MOCK_HEALTH_ALERTS: Record<string, HealthAlertsResponse> = {
-  'IN-OD-29': {
-    place_id: 'IN-OD-29',
-    active_alerts: [
-      {
-        id: 'alert-dph-2026-001',
-        field_name: 'Contaminated Water Supply Warning - Daya River Basin',
-        issuing_authority: 'Directorate of Public Health, Government of Odisha',
-        health_category: 'official_alert',
-        severity: 'moderate',
-        disease_code: 'A00 (Cholera / Waterborne Diarrheal Risk)',
-        valid_from: '2026-10-18T00:00:00Z',
-        valid_until: '2026-10-28T23:59:59Z',
-        affected_geography_level: 'district',
-        prevention_link: 'https://www.mohfw.gov.in/prevention-waterborne-diseases',
-        prevention_link_date: '2026-10-18',
-        notes:
-          'Boil drinking water advisory for downstream Daya basin blocks (Khordha, Jatni, Begunia). Chlorination tablets and mobile surveillance units deployed by district health teams.',
-        expired: false,
-        source_id: 'src-idsp',
-        licence: 'GODL-India',
-        retrieved_at: '2026-10-21T18:00:00Z',
-      },
-    ],
-    expired_alerts: [
-      {
-        id: 'alert-ncvbdc-2026-003',
-        field_name: 'Post-Monsoon Dengue Vector Advisory',
-        issuing_authority: 'National Center for Vector Borne Diseases Control (NCVBDC)',
-        health_category: 'official_alert',
-        severity: 'high',
-        disease_code: 'A90 (Dengue Fever)',
-        valid_from: '2026-08-15T00:00:00Z',
-        valid_until: '2026-10-01T00:00:00Z',
-        affected_geography_level: 'district',
-        prevention_link: 'https://nvbdcp.gov.in/index4.php?lang=1&level=0&linkid=431&lid=3715',
-        notes:
-          'Routine seasonal vector control and awareness campaign concluded. Surveillance continues.',
-        expired: true,
-        source_id: 'src-idsp',
-        licence: 'GODL-India',
-        retrieved_at: '2026-10-02T00:00:00Z',
-      },
-    ],
-    expired_count: 1,
-    source_count: 2,
-    note: 'Active alerts shown with issuing authority, validity dates, and prevention advice.',
-  },
-};
 
 export async function searchPlaces(query: string): Promise<SearchResponse> {
   if (!query.trim()) {
@@ -1513,9 +1464,6 @@ export async function getHealthAlerts(placeId: string): Promise<HealthAlertsResp
     // fallback
   }
 
-  if (MOCK_HEALTH_ALERTS[placeId]) {
-    return MOCK_HEALTH_ALERTS[placeId];
-  }
 
   // No alert is invented for an unknown place. "No active alerts" here means
   // Garuda has no ingested alert for this place, which is weaker than "the
@@ -1528,6 +1476,29 @@ export async function getHealthAlerts(placeId: string): Promise<HealthAlertsResp
     source_count: 0,
     note: 'No health alerts are available from Garuda\'s connected sources for this place.',
   };
+}
+
+/**
+ * Load latest Sentinel-2 observation metadata for a place.
+ * Returns null if the backend is unreachable or returns 404.
+ */
+export async function getEnvironmentScenes(
+  placeId: string,
+  raiseOnError = false,
+): Promise<LatestObservationResponse | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/places/${encodeURIComponent(placeId)}/environment-scenes${
+        raiseOnError ? '?raise_on_error=true' : ''
+      }`
+    );
+    if (res.ok) {
+      return (await res.json()) as LatestObservationResponse;
+    }
+  } catch {
+    // Backend offline / network error
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

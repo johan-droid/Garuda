@@ -7,6 +7,7 @@ import {
   reverseGeocodeWithProvenance,
   getHealthAlerts,
   getSourceDiagnostics,
+  getEnvironmentScenes,
   PILOT_PLACES,
 } from '../api/client';
 import {
@@ -16,6 +17,7 @@ import {
   PanelResponse,
   HealthAlertsResponse,
   SourceDiagnostics,
+  LatestObservationResponse,
 } from '../types/contracts';
 
 /**
@@ -72,6 +74,7 @@ export const HomePage: React.FC = () => {
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [diagnosticsData, setDiagnosticsData] = useState<SourceDiagnostics | null>(null);
   const [mapNotice, setMapNotice] = useState<string | null>(null);
+  const [environmentScene, setEnvironmentScene] = useState<LatestObservationResponse | null>(null);
 
   // Bookmarks live for the session only. Persisting them in browser storage
   // would retain the places a person inspected, which Garuda's no-retention
@@ -109,10 +112,12 @@ export const HomePage: React.FC = () => {
     Promise.all([
       getPlaceProfile(selectedPlace.id),
       getHealthAlerts(selectedPlace.id),
+      getEnvironmentScenes(selectedPlace.id),
     ])
-      .then(([profData, alertsData]) => {
+      .then(([profData, alertsData, sceneData]) => {
         setProfile(profData);
         setHealthAlerts(alertsData);
+        setEnvironmentScene(sceneData);
         setLoading(false);
       })
       .catch((err) => {
@@ -870,52 +875,60 @@ export const HomePage: React.FC = () => {
                   </div>
 
                   {/* Satellite Scene Metadata */}
-                  {panels.environment.observations?.some((o) => o.satellite_mission) && (
-                    <div className="satellite-metadata-box">
-                      <div className="sat-title">🛰️ Satellite Scene Metadata</div>
-                      <div className="sat-grid">
-                        <div>
-                          Mission:{' '}
-                          <span>
-                            {
-                              panels.environment.observations.find((o) => o.satellite_mission)
-                                ?.satellite_mission
-                            }
-                          </span>
+                  {(() => {
+                    const sceneObs =
+                      environmentScene?.observation ||
+                      panels.environment.observations?.find((o) => o.satellite_mission);
+                    if (sceneObs) {
+                      return (
+                        <div className="satellite-metadata-box">
+                          <div className="sat-title">🛰️ Sentinel-2 Satellite Scene Metadata</div>
+                          <div className="sat-grid">
+                            <div>
+                              Mission:{' '}
+                              <span>{sceneObs.satellite_mission || 'Sentinel-2 (ESA/Copernicus)'}</span>
+                            </div>
+                            <div>
+                              Resolution:{' '}
+                              <span>{sceneObs.resolution_meters ? `${sceneObs.resolution_meters}m` : '10m'}</span>
+                            </div>
+                            <div>
+                              Cloud Cover:{' '}
+                              <span>
+                                {sceneObs.cloud_cover_percentage != null
+                                  ? `${sceneObs.cloud_cover_percentage}%`
+                                  : 'N/A'}
+                              </span>
+                            </div>
+                            <div>
+                              Acquired:{' '}
+                              <span>
+                                {sceneObs.scene_timestamp
+                                  ? new Date(sceneObs.scene_timestamp).toLocaleDateString()
+                                  : 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+                          {sceneObs.value && (
+                            <div style={{ fontSize: '0.75rem', marginTop: '6px', color: '#64748b' }}>
+                              Scene ID: <code>{String(sceneObs.value)}</code>
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          Resolution:{' '}
-                          <span>
-                            {
-                              panels.environment.observations.find((o) => o.resolution_meters)
-                                ?.resolution_meters
-                            }
-                            m
-                          </span>
+                      );
+                    }
+                    if (environmentScene?.status === 'unavailable') {
+                      return (
+                        <div className="satellite-metadata-box" style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}>
+                          <div className="sat-title" style={{ color: '#64748b' }}>🛰️ Sentinel-2 Observation Metadata</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                            {environmentScene.unavailable_reason || 'No recent cloud-free scene available for this bounding box.'}
+                          </div>
                         </div>
-                        <div>
-                          Cloud Cover:{' '}
-                          <span>
-                            {
-                              panels.environment.observations.find(
-                                (o) => o.cloud_cover_percentage != null
-                              )?.cloud_cover_percentage
-                            }
-                            %
-                          </span>
-                        </div>
-                        <div>
-                          Acquired:{' '}
-                          <span>
-                            {new Date(
-                              panels.environment.observations.find((o) => o.scene_timestamp)
-                                ?.scene_timestamp || ''
-                            ).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                      );
+                    }
+                    return null;
+                  })()}
 
                   <div className="provenance-tag">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -938,12 +951,14 @@ export const HomePage: React.FC = () => {
                   <div className="metrics-grid">
                     <div className="metric-cell">
                       <div className="metric-value">
-                        {findObs(
-                          panels.weather.observations,
-                          'surface_temperature_celsius',
-                          'temperature'
-                        )?.value ?? 'N/A'}
-                        °C
+                        {(() => {
+                          const temp = findObs(
+                            panels.weather.observations,
+                            'surface_temperature_celsius',
+                            'temperature'
+                          );
+                          return temp?.value != null ? `${temp.value} °C` : 'N/A';
+                        })()}
                       </div>
                       <div className="metric-label">Temperature</div>
                     </div>

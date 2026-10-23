@@ -14,7 +14,6 @@ from app.domain.common import (
     PlaceType,
     VerificationStatus,
 )
-from enum import Enum
 
 
 def utcnow() -> datetime:
@@ -263,18 +262,6 @@ class LatestObservationResponse(BaseModel):
     data_gaps: list[str] = Field(default_factory=list)
 
 
-class LatestObservationResponse(BaseModel):
-    """Response envelope for a single latest-observation endpoint."""
-
-    place: Place
-    field_name: str
-    status: GetLatestObservationStatus
-    observation: Observation | None = None
-    unavailable_reason: str | None = None
-    retrieved_at: datetime = Field(default_factory=utcnow)
-    coverage_note: str | None = None
-    data_gaps: list[str] = Field(default_factory=list)
-
 
 class ApiError(BaseModel):
     """Uniform error envelope returned by the API."""
@@ -285,13 +272,6 @@ class ApiError(BaseModel):
     request_id: str | None = None
     details: Any | None = None
 
-
-class GetLatestObservationStatus(str, Enum):
-    """Status for the latest available observation endpoint."""
-
-    CURRENT = "current"
-    RELUCTANT = "reluctant"
-    UNAVAILABLE = "unavailable"
 
 
 class ReverseGeocodeResponse(BaseModel):

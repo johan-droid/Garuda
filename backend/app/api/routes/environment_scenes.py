@@ -11,30 +11,23 @@ returned scene is current.
 Because this answers a specific location query, it is marked `no-store`.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
-from typing import Annotated
 
-from app.api.deps.responses import json_with_etag
 from app.api.deps.session import get_db
-from app.core.config import settings
-
-SessionDep = Annotated[Session, Depends(get_db)]
-from app.domain.common import (
-    DOMAIN_ENVIRONMENT,
-    DataStatus,
-)
+from app.domain.common import DataStatus, PlaceType
 from app.domain.contracts import (
     GetLatestObservationStatus,
     LatestObservationResponse,
     Observation,
     Place,
 )
-from app.services import observation_service
 from app.services.provider_adapters import EarthSearchSentinelAdapter
+
+SessionDep = Annotated[Session, Depends(get_db)]
 
 router = APIRouter(prefix="", tags=["environment-scenes"])
 
@@ -55,6 +48,22 @@ def _extract_place_bbox(place_id: str, session: Session) -> tuple[float, float, 
     east = lng + 0.05
     north = lat + 0.05
     return (west, south, east, north)
+
+
+def _place_model_to_place(place: Any) -> Place:
+    coords = (
+        (place.latitude, place.longitude)
+        if (getattr(place, "latitude", None) is not None and getattr(place, "longitude", None) is not None)
+        else None
+    )
+    raw_type = getattr(place, "place_type", PlaceType.POINT)
+    return Place(
+        id=place.id,
+        canonical_name=place.canonical_name,
+        place_type=PlaceType(raw_type) if raw_type else PlaceType.POINT,
+        coordinates=coords,
+        geometry_available=getattr(place, "geometry_available", False),
+    )
 
 
 @router.get(
@@ -80,6 +89,8 @@ def environment_scenes(
 
     Because this answers a specific location query, it is marked `no-store`.
     """
+    response.headers["Cache-Control"] = "no-store"
+
     # First verify the place exists
     from app.models.entities import PlaceModel
     place = session.get(PlaceModel, place_id)
@@ -92,13 +103,7 @@ def environment_scenes(
         # Place has no coordinates; return unavailable
         now = datetime.now(UTC)
         return LatestObservationResponse(
-            place=Place(
-                id=place_id,
-                canonical_name=place_id,
-                place_type="point",
-                coordinates=(place.longitude, place.latitude) if (place.longitude is not None and place.latitude is not None) else None,
-                geometry_available=False,
-            ),
+            place=_place_model_to_place(place),
             field_name="latest_sentinel2_scene",
             status=GetLatestObservationStatus.UNAVAILABLE,
             unavailable_reason="Place has no geocoded coordinates.",
@@ -116,13 +121,7 @@ def environment_scenes(
             raise
         now = datetime.now(UTC)
         return LatestObservationResponse(
-            place=Place(
-                id=place_id,
-                canonical_name=place_id,
-                place_type="point",
-                coordinates=(place.longitude, place.latitude) if (place.longitude is not None and place.latitude is not None) else None,
-                geometry_available=False,
-            ),
+            place=_place_model_to_place(place),
             field_name="latest_sentinel2_scene",
             status=GetLatestObservationStatus.UNAVAILABLE,
             unavailable_reason=str(exc),
@@ -134,13 +133,7 @@ def environment_scenes(
     if not observations:
         now = datetime.now(UTC)
         return LatestObservationResponse(
-            place=Place(
-                id=place_id,
-                canonical_name=place_id,
-                place_type="point",
-                coordinates=(place.longitude, place.latitude) if (place.longitude is not None and place.latitude is not None) else None,
-                geometry_available=False,
-            ),
+            place=_place_model_to_place(place),
             field_name="latest_sentinel2_scene",
             status=GetLatestObservationStatus.UNAVAILABLE,
             unavailable_reason="No Sentinel-2 scene found covering this area.",
@@ -151,18 +144,23 @@ def environment_scenes(
 
     # observations is a list; take the first (best) one
     obs = observations[0]
+    if obs.quality_status == DataStatus.UNAVAILABLE or obs.value is None:
+        now = datetime.now(UTC)
+        return LatestObservationResponse(
+            place=_place_model_to_place(place),
+            field_name=obs.field_name,
+            status=GetLatestObservationStatus.UNAVAILABLE,
+            unavailable_reason=obs.notes or "No Sentinel-2 scene found covering this area.",
+            retrieved_at=now,
+            coverage_note=obs.notes or "No Sentinel-2 L2A scene with cloud cover ≤40% was found covering the area near this place in the searched date window.",
+            data_gaps=["no_sentinel_scene"],
+        )
 
     # Build the response
     retrieved_at = obs.retrieved_at
     # Map the observation fields to the response model
     return LatestObservationResponse(
-        place=Place(
-            id=place.id,
-            canonical_name=place.canonical_name,
-            place_type=place.place_type,
-            coordinates=place.coordinates,
-            geometry_available=place.geometry_available,
-        ),
+        place=_place_model_to_place(place),
         field_name=obs.field_name,
         status=GetLatestObservationStatus.CURRENT,
         observation=Observation(

@@ -45,24 +45,7 @@ logger = get_logger("garuda.providers")
 
 
 
-def _parse_datetime(value: Any) -> datetime | None:
-    """Safely parse a STAC datetime string into a timezone-aware UTC datetime."""
-    if not value:
-        return None
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=UTC)
-        return value
-    s = str(value).strip()
-    if not s:
-        return None
-    try:
-        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt
+
 
 
 class ProviderError(Exception):
@@ -77,7 +60,7 @@ class ProviderConfigurationError(ProviderError):
     """Raised when an adapter is not configured (e.g. missing base URL)."""
 
 
-class ProviderTimeoutError(ProviderError):
+class ProviderTimeoutError(ProviderUnavailableError):
     """Raised when an upstream provider timed out."""
 
 
@@ -107,8 +90,11 @@ def _parse_datetime(value: Any) -> datetime | None:
         if value.tzinfo is None:
             return value.replace(tzinfo=UTC)
         return value
+    s = str(value).strip()
+    if not s:
+        return None
     try:
-        dt = datetime.fromisoformat(str(value))
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         if dt.tzinfo is None:
             return dt.replace(tzinfo=UTC)
         return dt
@@ -213,6 +199,15 @@ class BaseProviderAdapter(ABC):
                         f"Upstream rate-limited the request: {url}"
                     ) from exc
                 last_error = exc
+                if (
+                    exc.response is not None
+                    and exc.response.status_code >= 500
+                    and attempt < attempts - 1
+                ):
+                    if self.backoff_base > 0:
+                        time.sleep(min(backoff, settings.UPSTREAM_BACKOFF_MAX_SECONDS))
+                        backoff *= 2
+                    continue
                 break
             except Exception as exc:
                 last_error = exc
@@ -265,7 +260,9 @@ class IMDWeatherAdapter(BaseProviderAdapter):
     ) -> list[Observation]:
         """IMD does not provide bbox-based observations; return unavailable."""
         should_raise = self.raise_on_error if raise_on_error is None else raise_on_error
-        return self._unavailable_observations("bbox", error_reason="IMD does not support bbox queries", raise_on_error=should_raise)
+        if should_raise:
+            raise ProviderUnavailableError("IMD does not support bbox queries")
+        return self._unavailable_observations("bbox", error_reason="IMD does not support bbox queries")
 
     def fetch_sources(self) -> list[SourceSummary]:
         """Return SourceSummary attribution for IMD."""
@@ -695,7 +692,7 @@ class EarthSearchSentinelAdapter(BaseProviderAdapter):
                 )
             ]
 
-        candidates.sort(key=lambda c: (c["cloud_cover"], c["datetime"]))
+        candidates.sort(key=lambda c: (-c["datetime"].timestamp(), c["cloud_cover"]))
         best = candidates[0]
         return [
             Observation(
@@ -736,9 +733,9 @@ class EarthSearchSentinelAdapter(BaseProviderAdapter):
         dt = _parse_datetime(props.get("datetime"))
         if dt is None:
             return None
-        cloud = props.get("eo:cloud_cover")
+        cloud_raw = props.get("eo:cloud_cover")
         try:
-            cloud = float(cloud)
+            cloud = float(cloud_raw) if cloud_raw is not None else -1.0
         except (TypeError, ValueError):
             cloud = -1.0
         bbox = scene.get("bbox")
@@ -761,8 +758,8 @@ class EarthSearchSentinelAdapter(BaseProviderAdapter):
         }
 
     def _footprint_covers(self, bbox: list[float], west: float, south: float, east: float, north: float) -> bool:
-        s, w, n, e = bbox
-        return w <= west and s <= south and e >= east and n >= north
+        bw, bs, be, bn = bbox
+        return bw <= west and bs <= south and be >= east and bn >= north
 
     def _no_scene_note(self, west: float, south: float, east: float, north: float) -> str:
         return (
@@ -839,7 +836,9 @@ class NHMHealthAdapter(BaseProviderAdapter):
     ) -> list[Observation]:
         """NHM does not provide bbox-based observations; return unavailable."""
         should_raise = self.raise_on_error if raise_on_error is None else raise_on_error
-        return self._unavailable_observations("bbox", error_reason="NHM does not support bbox queries", raise_on_error=should_raise)
+        if should_raise:
+            raise ProviderUnavailableError("NHM does not support bbox queries")
+        return self._unavailable_observations("bbox", error_reason="NHM does not support bbox queries")
 
     def fetch_sources(self) -> list[SourceSummary]:
         """Return SourceSummary attribution for NHM."""

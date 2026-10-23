@@ -214,3 +214,16 @@ export interface GeoJsonFeatureCollection<P = BoundaryProperties> {
 }
 
 export type LiveBoundaryCollection = GeoJsonFeatureCollection<LiveBoundaryProperties>;
+
+export type GetLatestObservationStatus = 'current' | 'reluctant' | 'unavailable';
+
+export interface LatestObservationResponse {
+  place: Place;
+  field_name: string;
+  status: GetLatestObservationStatus;
+  observation?: Observation | null;
+  unavailable_reason?: string | null;
+  retrieved_at?: string;
+  coverage_note?: string | null;
+  data_gaps?: string[];
+}

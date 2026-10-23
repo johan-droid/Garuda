@@ -127,6 +127,11 @@ GARUDA_*.md
 docs/plans/
 docs/imagery-pipeline.md
 
+# Generated documentation artefacts (rebuild via: make docs)
+# The source-of-truth Markdown lives in docs/; compiled outputs are not committed.
+docs/GARUDA_COMPLETE_PROJECT_DOCUMENTATION.html
+docs/GARUDA_COMPLETE_PROJECT_DOCUMENTATION.pdf
+
 # --- Editor, IDE & Operating System Artifacts ------------------------------
 .vscode/*
 !.vscode/extensions.json
