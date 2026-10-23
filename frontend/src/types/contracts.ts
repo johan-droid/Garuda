@@ -91,6 +91,8 @@ export interface Observation {
   published_at?: string | null;
   notes?: string | null;
   domain?: string | null;
+  /** Link to the record the value came from, when the source publishes one. */
+  source_url?: string | null;
 
   // Health-specific extended fields
   health_category?: string;

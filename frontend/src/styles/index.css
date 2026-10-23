@@ -940,3 +940,16 @@ body {
   background: #ef4444;
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
+
+/* Coverage / resolution notice attached to a map selection. Amber, not red:
+   it is a statement about scope, not a failed request. */
+.coverage-notice {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fde68a;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}

@@ -33,31 +33,12 @@ export const MapView: React.FC<MapViewProps> = ({
     // Center is [lat, lng], MapLibre expects [lng, lat]
     const m = new maplibregl.Map({
       container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          'carto-dark': {
-            type: 'raster',
-            tiles: [
-              'https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-              'https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-              'https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-            ],
-            tileSize: 256,
-            attribution:
-              '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors, © <a href="https://carto.com/" target="_blank" rel="noreferrer">CARTO</a>',
-          },
-        },
-        layers: [
-          {
-            id: 'carto-dark-layer',
-            type: 'raster',
-            source: 'carto-dark',
-            minzoom: 0,
-            maxzoom: 19,
-          },
-        ],
-      },
+      // OpenFreeMap's public instance is keyless and unauthenticated. CARTO's
+      // rastertiles now answer unkeyed requests with "API KEY REQUIRED"
+      // watermarks, which would make the default map depend on a credential.
+      // ponytail: third-party free instance, no SLA; self-host the style if
+      // availability ever matters.
+      style: 'https://tiles.openfreemap.org/styles/dark',
       center: [center[1], center[0]],
       zoom: zoom,
     });
@@ -75,12 +56,24 @@ export const MapView: React.FC<MapViewProps> = ({
     m.on('load', async () => {
       try {
         const geojson = await getBoundaries();
-        boundariesData.current = geojson;
+        // The live backend emits `place_type`; the bundled fixture emits
+        // `level`. Normalise once, so the style filters below work for both.
+        const normalized = {
+          ...geojson,
+          features: geojson.features.map((feature) => {
+            const props = feature.properties as unknown as Record<string, unknown>;
+            return {
+              ...feature,
+              properties: { ...props, level: props.level ?? props.place_type },
+            };
+          }),
+        };
+        boundariesData.current = normalized as unknown as GeoJsonFeatureCollection;
 
         if (!m.getSource('garuda-boundaries')) {
           m.addSource('garuda-boundaries', {
             type: 'geojson',
-            data: geojson as any,
+            data: normalized as any,
           });
 
           // 1. State Boundaries Layer (Blue tint)
@@ -269,10 +262,10 @@ export const MapView: React.FC<MapViewProps> = ({
           OpenStreetMap
         </a>{' '}
         | Basemap: ©{' '}
-        <a href="https://carto.com/" target="_blank" rel="noreferrer">
-          CARTO
+        <a href="https://openfreemap.org/" target="_blank" rel="noreferrer">
+          OpenFreeMap
         </a>{' '}
-        | Boundaries: Survey of India / Census 2011 (GODL-India)
+        | Boundaries: Garuda pilot fixture (schematic outlines, not survey-grade)
       </div>
     </div>
   );

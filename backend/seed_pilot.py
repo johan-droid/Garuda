@@ -1,11 +1,17 @@
 """Seed script for Project Garuda - Khordha District, Odisha Pilot.
 
-Initializes database schema and populates garuda_local.db with real, verified
-data across all domains:
+Initializes database schema and populates garuda_local.db with the pilot
+dataset:
   - 10 Places (Odisha state, Khordha district, 8 blocks/subdistricts) with aliases
   - 7 Registered Sources (Census 2011, MoHFW/NHM, IDSP NCDC, UDISE+, ASI, IMD, ISRO Bhuvan)
   - Observations across all domains (Demographics, Health, Health Alerts, Services,
     History & Culture, Environment, Weather & Disasters)
+
+Provenance honesty: only the reference-dated figures carry a published period
+(the Census 2011 block). The remaining pilot values are fixtures kept so every
+panel can render; because they are undated, they are stored as `unverified` and
+never surface as a current observation. See GARUDA_DATA_CAPABILITY_MATRIX.md for
+which of these indicators can be sourced for real.
 """
 
 from datetime import UTC, date, datetime, timedelta
@@ -696,6 +702,17 @@ def seed_database(session: Session) -> dict[str, int]:
             notes="National Disaster Management Authority coastal safety directive.",
         )
     )
+
+    # An undated value must never read as current. Some pilot figures below are
+    # illustrative: they carry no reference period and no source URL, so the
+    # freshness rules cannot establish when they describe. They are kept so the
+    # panels render, but stored as `unverified` so no read path presents them as
+    # an observation of the present.
+    for row in session.query(ObservationModel).all():
+        if row.reference_period_end is None and row.published_at is None and not row.source_url:
+            row.quality_status = "unverified"
+            if not row.notes:
+                row.notes = "Pilot fixture value with no reference period; not a published measurement."
 
     session.commit()
 

@@ -125,7 +125,9 @@ def reverse_geocode(session: Session, lat: float, lng: float) -> ReverseGeocodeR
     """Reverse geocode coordinates to the enclosing or nearest supported place in the pilot hierarchy.
 
     Hierarchy checks subdistricts first (most granular), then district, then state.
-    If outside all polygons, falls back to the nearest supported centroid.
+    If outside all polygons, the nearest supported centroid is returned as a
+    *reference only*: `inside_coverage` is False and `coverage_note` says so.
+    A client must not present that place's statistics as belonging to the pin.
     """
     boundaries = load_pilot_boundaries()
     features = boundaries.get("features", [])
@@ -213,6 +215,17 @@ def reverse_geocode(session: Session, lat: float, lng: float) -> ReverseGeocodeR
             hierarchy.district = "Khordha"
             hierarchy.subdistrict = props["canonical_name"]
 
+    inside_coverage = match_type == "enclosing"
+    if inside_coverage:
+        coverage_note = None
+    else:
+        coverage_note = (
+            f"This point is outside Garuda's supported boundaries. "
+            f"The nearest supported boundary, {place.canonical_name}, is "
+            f"{distance_km:.0f} km away and its statistics do not describe "
+            f"this point."
+        )
+
     return ReverseGeocodeResponse(
         place=place,
         hierarchy=hierarchy,
@@ -220,4 +233,6 @@ def reverse_geocode(session: Session, lat: float, lng: float) -> ReverseGeocodeR
         distance_km=distance_km,
         latitude=lat,
         longitude=lng,
+        inside_coverage=inside_coverage,
+        coverage_note=coverage_note,
     )

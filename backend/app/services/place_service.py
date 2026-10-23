@@ -248,6 +248,7 @@ def to_observation(row: ObservationModel) -> Observation:
         licence=row.licence,
         notes=row.notes,
         domain=row.domain,
+        source_url=row.source_url,
     )
 
 
@@ -284,6 +285,7 @@ def to_health_observation(row: ObservationModel, now: datetime) -> HealthObserva
         disease_code=row.disease_code,
         prevention_link=row.prevention_link,
         prevention_link_date=row.prevention_link_date,
+        source_url=row.source_url,
     )
     view.compute_expiry(now)
     return view

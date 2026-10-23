@@ -4,7 +4,7 @@ import {
   searchPlaces,
   getPlaceProfile,
   checkHealth,
-  reverseGeocode,
+  reverseGeocodeWithProvenance,
   getHealthAlerts,
   getSourceDiagnostics,
   PILOT_PLACES,
@@ -18,7 +18,42 @@ import {
   SourceDiagnostics,
 } from '../types/contracts';
 
-const STORAGE_BOOKMARKS_KEY = 'garuda_saved_places';
+/**
+ * Status badge for a profile panel.
+ *
+ * The label comes from the panel's own status, never from a per-card promise
+ * such as "Verified NHM Source": a card must not claim more about its figures
+ * than the panel does. A reference year is appended when the panel carries one,
+ * so "Historical (2011)" is read from the data rather than hardcoded.
+ */
+const PANEL_STATUS_BADGE: Record<string, { label: string; className: string }> = {
+  current: { label: 'Current', className: 'badge-verified' },
+  historical: { label: 'Historical', className: 'badge-hist' },
+  stale: { label: 'Stale', className: 'badge-stale' },
+  approximate: { label: 'Approximate', className: 'badge-hist' },
+  unverified: { label: 'Unverified', className: 'badge-unavail' },
+  unavailable: { label: 'Unavailable', className: 'badge-unavail' },
+  conflicting: { label: 'Conflicting sources', className: 'badge-unavail' },
+};
+
+function PanelBadge({ panel }: { panel?: PanelResponse }) {
+  if (!panel) return null;
+  const badge = PANEL_STATUS_BADGE[panel.status] ?? {
+    label: panel.status,
+    className: 'badge-hist',
+  };
+  const referenceYear = panel.observations
+    ?.map((obs) => obs.reference_period_end)
+    .find((end): end is string => Boolean(end))
+    ?.slice(0, 4);
+
+  return (
+    <span className={`badge ${badge.className}`}>
+      {badge.label}
+      {referenceYear ? ` (${referenceYear})` : ''}
+    </span>
+  );
+}
 
 export const HomePage: React.FC = () => {
   const [query, setQuery] = useState('');
@@ -36,16 +71,12 @@ export const HomePage: React.FC = () => {
   const [showProvenanceModal, setShowProvenanceModal] = useState(false);
   const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
   const [diagnosticsData, setDiagnosticsData] = useState<SourceDiagnostics | null>(null);
+  const [mapNotice, setMapNotice] = useState<string | null>(null);
 
-  // Saved Bookmarks state
-  const [savedPlaces, setSavedPlaces] = useState<Place[]>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_BOOKMARKS_KEY);
-      return stored ? JSON.parse(stored) : [PILOT_PLACES[1], PILOT_PLACES[2]];
-    } catch {
-      return [PILOT_PLACES[1]];
-    }
-  });
+  // Bookmarks live for the session only. Persisting them in browser storage
+  // would retain the places a person inspected, which Garuda's no-retention
+  // contract forbids.
+  const [savedPlaces, setSavedPlaces] = useState<Place[]>([PILOT_PLACES[1], PILOT_PLACES[2]]);
 
   // Check health and online status
   useEffect(() => {
@@ -113,15 +144,31 @@ export const HomePage: React.FC = () => {
   };
 
   // Handle Map Click -> Reverse Geocode -> Select Place
+  //
+  // A pin outside the supported boundaries must not inherit the nearest
+  // boundary's statistics, and an unreachable backend must not produce a
+  // guessed place.
   const handleMapClick = async (lat: number, lng: number) => {
     setLoading(true);
+    setMapNotice(null);
     try {
-      const resolved = await reverseGeocode(lat, lng);
-      setSelectedPlace(resolved);
+      const { data, live } = await reverseGeocodeWithProvenance(lat, lng);
+      if (!live || !data) {
+        setMapNotice(
+          `Could not resolve ${lat.toFixed(3)}, ${lng.toFixed(3)}: the Garuda backend is unreachable.`,
+        );
+        return;
+      }
+      if (!data.inside_coverage) {
+        setMapNotice(
+          data.coverage_note ??
+            `${lat.toFixed(3)}, ${lng.toFixed(3)} is outside Garuda's supported boundaries.`,
+        );
+        return;
+      }
+      setSelectedPlace(data.place);
       setSearchResults([]);
       setQuery('');
-    } catch (err) {
-      console.error('Reverse geocode error:', err);
     } finally {
       setLoading(false);
     }
@@ -137,11 +184,6 @@ export const HomePage: React.FC = () => {
       updated = [...savedPlaces, selectedPlace];
     }
     setSavedPlaces(updated);
-    try {
-      localStorage.setItem(STORAGE_BOOKMARKS_KEY, JSON.stringify(updated));
-    } catch (err) {
-      console.warn('Could not persist bookmark:', err);
-    }
   };
 
   // Open Diagnostics Modal
@@ -271,7 +313,10 @@ export const HomePage: React.FC = () => {
             <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
             <line x1="12" y1="20" x2="12.01" y2="20" />
           </svg>
-          <span>Offline Mode — Viewing Verified Cached Pilot Data (Backend / Network Offline)</span>
+          <span>
+            Offline — showing bundled pilot sample data for the pilot place only. Figures are not
+            live and are not a measurement of any other location.
+          </span>
         </div>
       )}
 
@@ -419,6 +464,12 @@ export const HomePage: React.FC = () => {
                   Coordinates: {center[0].toFixed(4)}° N, {center[1].toFixed(4)}° E
                 </div>
 
+                {mapNotice && (
+                  <div className="coverage-notice" role="status">
+                    {mapNotice}
+                  </div>
+                )}
+
                 {/* Place Action Toolbar */}
                 <div className="place-actions-toolbar">
                   <button
@@ -453,6 +504,19 @@ export const HomePage: React.FC = () => {
               {loading && (
                 <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8' }}>
                   Loading place intelligence...
+                </div>
+              )}
+
+              {!loading && !profile && (
+                <div className="card card-unavailable">
+                  <div className="card-title">
+                    <span>PLACE INTELLIGENCE — NOT AVAILABLE</span>
+                    <span className="badge badge-unavail">UNAVAILABLE</span>
+                  </div>
+                  <div className="data-gaps-explanation">
+                    Garuda has no published profile for this place. Nothing is generated to fill
+                    the gap.
+                  </div>
                 </div>
               )}
 
@@ -535,7 +599,7 @@ export const HomePage: React.FC = () => {
                 <div className="card">
                   <div className="card-title">
                     <span>Population & Demographics</span>
-                    <span className="badge badge-hist">Historical (2011)</span>
+                    <PanelBadge panel={panels.demographics} />
                   </div>
                   <div className="metrics-grid">
                     <div className="metric-cell">
@@ -587,7 +651,7 @@ export const HomePage: React.FC = () => {
                 <div className="card">
                   <div className="card-title">
                     <span>Public Health & Surveillance</span>
-                    <span className="badge badge-verified">Verified NHM Source</span>
+                    <PanelBadge panel={panels.health} />
                   </div>
                   <div className="metrics-grid">
                     <div className="metric-cell">
@@ -667,7 +731,7 @@ export const HomePage: React.FC = () => {
                 <div className="card">
                   <div className="card-title">
                     <span>Public Services & Education</span>
-                    <span className="badge badge-pilot">UDISE+ 2023-24</span>
+                    <PanelBadge panel={panels.services} />
                   </div>
                   <div className="metrics-grid">
                     <div className="metric-cell">
@@ -722,7 +786,7 @@ export const HomePage: React.FC = () => {
                 <div className="card">
                   <div className="card-title">
                     <span>History & Heritage Sites</span>
-                    <span className="badge badge-verified">ASI Citations</span>
+                    <PanelBadge panel={panels.culture} />
                   </div>
                   <div className="culture-list">
                     {panels.culture.observations && panels.culture.observations.length > 0 ? (
@@ -764,7 +828,7 @@ export const HomePage: React.FC = () => {
                 <div className="card">
                   <div className="card-title">
                     <span>Environment & Satellite Imagery</span>
-                    <span className="badge badge-pilot">ISRO Bhuvan / Sentinel-2</span>
+                    <PanelBadge panel={panels.environment} />
                   </div>
                   <div className="metrics-grid">
                     <div className="metric-cell">
@@ -869,7 +933,7 @@ export const HomePage: React.FC = () => {
                 <div className="card">
                   <div className="card-title">
                     <span>Weather & Meteorological Observations</span>
-                    <span className="badge badge-pilot">IMD Station</span>
+                    <PanelBadge panel={panels.weather} />
                   </div>
                   <div className="metrics-grid">
                     <div className="metric-cell">

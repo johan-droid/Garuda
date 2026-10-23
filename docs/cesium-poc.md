@@ -2,8 +2,11 @@
 
 Opt-in 3D globe with real elevation, added beside the default MapLibre map.
 
-- Entry point: `/?globe=1` (the default `/` is unchanged and still MapLibre).
+- Entry point: `/?globe=1` (the default `/` is still MapLibre).
 - Scope: isolated spike. It does not modify the backend, the database, `MapView.tsx` or `HomePage.tsx`.
+- Basemap note (2026-10-23): the default MapLibre view now uses OpenFreeMap's keyless
+  dark style instead of CARTO, whose unkeyed tiles render "API KEY REQUIRED" watermarks.
+  This is the one intentional change outside the globe, required by the zero-credential rule.
 
 ## How it runs
 
@@ -32,20 +35,30 @@ CesiumGlobe ── Viewer (no Cesium ion)
         │     CustomHeightmapTerrainProvider + WebMercatorTilingScheme
         └── imagery: NASA GIBS EPSG:3857 WMTS
               BlueMarble_ShadedRelief_Bathymetry   (base, GoogleMapsCompatible_Level8)
+              local Sentinel-2 mosaic              (overlay, z11–z14, same-origin, optional)
               Reference_Features_15m               (overlay, Level13)
               Reference_Labels_15m                 (overlay, Level13)
 ```
 
-## Providers (verified 2026-10-22)
+## Providers (verified 2026-10-22 / 2026-10-23)
 
 | Provider | Role | Access | Licence / attribution | Limits |
 |---|---|---|---|---|
 | Mapterhorn | terrain | `https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`, no key | Copernicus GLO-30 full, free and open licence; see `ATTRIBUTION.md` | global 30 m, z0–z12, 404 on ocean/no-data tiles |
 | NASA GIBS | imagery + cartography | `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/wmts.cgi`, no key | NASA EOSDIS, free and open; acknowledgement required | BlueMarble ≤ ~611 m/px (level 8); reference overlays to level 13 |
+| Sentinel-2 L2A (local) | imagery overlay | `tools/imagery` reads `earth-search.aws.element84.com` + `sentinel-cogs` anonymously; tiles served same-origin | Sentinel Data Legal Notice; "Contains modified Copernicus Sentinel data {years}" | bounded region only, z11–z14; ~10 m source detail |
+| OpenFreeMap (default 2D map) | vector basemap | `https://tiles.openfreemap.org/styles/dark`, no key | OSM ODbL + OpenMapTiles; attribution rendered | public instance, no SLA |
 
-Copernicus DEM GLO-90 was investigated and rejected as the default: there is no hosted
-Cesium terrain endpoint, the source products need a Copernicus Data Space account, and
-delivery requires converting DTED/GeoTIFF to quantized-mesh and hosting it yourself.
+### Why Mapterhorn rather than raw Copernicus DEM
+
+Copernicus DEM GLO-30 source COGs **are** anonymously readable from the AWS Open Data
+mirror (`copernicus-dem-30m.s3.amazonaws.com`, verified 2026-10-23) — no account is
+needed there. The real blocker is delivery: Cesium needs heightmap tiles or
+quantized-mesh, so adopting it directly means downloading, mosaicking, converting, and
+hosting our own terrain tiles. Mapterhorn already publishes the same GLO-30 data as
+keyless Terrarium WebP, so it remains the working provider. (GLO-30 is a DSM, 30 m
+posting, EGM2008 heights; do not confuse its native detail with the 128 px heightmaps
+Cesium requests.)
 
 ### Why EPSG:3857 GIBS instead of EPSG:4326
 
@@ -77,10 +90,14 @@ heightmap resolution, camera target and attribution string.
 
 ## Known limitations
 
-- **Imagery resolution**: GIBS tops out around 611 m/px for the base layer, so the
-  district-level view is blurry even though terrain detail is 30 m. Higher-resolution
-  open satellite mosaics checked (e.g. EOX Sentinel-2 cloudless) are CC BY-NC-SA and
-  therefore not suitable.
+- **Imagery resolution**: outside the generated mosaic the base is NASA GIBS Blue
+  Marble at ≤ ~611 m/px, so the global/district view is soft. Inside the bounded
+  Odisha region the local Sentinel-2 mosaic provides ~10 m native detail (z14 renders
+  at ~8.95 m ground, a mild upsample). EOX Sentinel-2 cloudless was rejected:
+  CC BY-NC-SA, so not suitable.
+- **Bounded mosaic**: only the configured bbox is high-resolution. It is one
+  acquisition-dominated composite, not a cloud-free national mosaic; see
+  `docs/imagery-pipeline.md` for masks, gaps, and scene dates.
 - **Polar distortion**: mercator terrain is stretched near ±85° when the whole Earth is
   in view. Acceptable for an India-centric POC; a geographic-reprojected or self-hosted
   quantized-mesh tileset removes it.
@@ -114,7 +131,10 @@ Browser checks used during development (Playwright, headless GPU = AMD Radeon vi
 | Imagery requests | 1784 × 200, 13 transient 500 |
 | Frame rate during camera fly | ~45 fps at 1600×950 |
 | Backend stopped | "Backend unavailable · no boundaries shown", 0 boundary rows, no fixture names |
-| Default `/` route | MapLibre canvas present, Cesium globals absent, no console errors |
+| Sentinel-2 mosaic at 26 km camera height | 4 imagery layers (base + mosaic + 2 overlays); z11–z12 tiles HTTP 200; seams visually continuous |
+| Mosaic manifest removed | viewer still renders GIBS base immediately; sidebar says mosaic unavailable and how to rebuild |
+| Cesium ion / token requests | 0 |
+| Default `/` route (2026-10-23) | MapLibre canvas present, Cesium globals absent; OpenFreeMap dark style, keyless, attribution rendered |
 
 ## Rollback
 

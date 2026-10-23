@@ -3,15 +3,22 @@ import '../cesium/env';
 import { useEffect, useRef, useState } from 'react';
 import * as Cesium from 'cesium';
 import type { GeoJsonFeatureCollection, LiveBoundaryProperties } from '../types/contracts';
-import { CAMERAS, ELLIPSOID_FALLBACK, OPEN_TERRAIN_SOURCE } from '../cesium/config';
+import {
+  CAMERAS,
+  ELLIPSOID_FALLBACK,
+  OPEN_TERRAIN_SOURCE,
+  type LocalMosaicManifest,
+} from '../cesium/config';
 import { createTerrain } from '../cesium/terrain';
-import { addImageryLayers } from '../cesium/imagery';
+import { addImageryLayers, addMosaicLayer } from '../cesium/imagery';
 
 interface CesiumGlobeProps {
   boundaries: GeoJsonFeatureCollection<LiveBoundaryProperties> | null;
   selectedId: string | null;
   onSelectPlace: (placeId: string, label: string) => void;
   onReverseGeocode: (lat: number, lng: number) => void;
+  /** Optional generated Sentinel-2 mosaic; null/absent keeps GIBS base only. */
+  mosaic?: LocalMosaicManifest | null;
 }
 
 const BOUNDARY_COLOR = Cesium.Color.fromCssColorString('#ffcf5c');
@@ -38,11 +45,13 @@ export function CesiumGlobe({
   selectedId,
   onSelectPlace,
   onReverseGeocode,
+  mosaic = null,
 }: CesiumGlobeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const callbacksRef = useRef({ onSelectPlace, onReverseGeocode });
   const boundaryEntitiesRef = useRef<Map<string, Cesium.Entity[]>>(new Map());
+  const mosaicLayerRef = useRef<Cesium.ImageryLayer | null>(null);
 
   const [ready, setReady] = useState(false);
   const [tilesLoading, setTilesLoading] = useState(true);
@@ -164,6 +173,28 @@ export function CesiumGlobe({
       }
     };
   }, []);
+
+  // The mosaic is optional and resolves after the viewer starts. Never gate
+  // the globe on a manifest request; add/remove the layer when it changes.
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !ready) return;
+
+    if (mosaicLayerRef.current) {
+      viewer.imageryLayers.remove(mosaicLayerRef.current, true);
+      mosaicLayerRef.current = null;
+    }
+    if (mosaic) {
+      mosaicLayerRef.current = addMosaicLayer(viewer, mosaic);
+    }
+    return () => {
+      // The viewer-init effect cleans up first and destroys the viewer.
+      if (mosaicLayerRef.current && !viewer.isDestroyed()) {
+        viewer.imageryLayers.remove(mosaicLayerRef.current, true);
+        mosaicLayerRef.current = null;
+      }
+    };
+  }, [mosaic, ready]);
 
   useEffect(() => {
     const viewer = viewerRef.current;

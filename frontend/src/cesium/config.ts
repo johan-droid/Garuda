@@ -127,6 +127,29 @@ export const IMAGERY_LAYERS: ImageryLayerConfig[] = [
 
 export const CESIUM_ATTRIBUTION = 'CesiumJS © CesiumGS, Inc. — Apache License 2.0';
 
+/**
+ * Manifest written by `tools/imagery/build_composite.py` next to the generated
+ * XYZ tiles. Shape-checked at runtime before use; anything malformed means the
+ * mosaic layer is skipped, never guessed.
+ */
+export interface LocalMosaicManifest {
+  region: string;
+  attribution_display: string;
+  mosaic: {
+    bbox_wgs84: number[];
+    ground_res_m: number;
+    merc_res_m: number;
+  };
+  tiles_per_level: Record<string, { count: number; non_transparent: number }>;
+}
+
+/**
+ * Runtime-fetchable manifests of locally generated Sentinel-2 mosaics.
+ * Add one path per region; absent files simply mean the globe renders the
+ * GIBS base imagery and the UI says the mosaic is unavailable.
+ */
+export const LOCAL_MOSAIC_MANIFESTS = ['/imagery/odisha-test/manifest.json'];
+
 export const CAMERAS = {
   earth: { longitude: 78.9629, latitude: 20.5937, height: 16_000_000 },
   india: { longitude: 82.5, latitude: 22.5, height: 3_200_000 },

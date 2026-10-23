@@ -7,7 +7,8 @@ import {
   reverseGeocodeWithProvenance,
 } from '../api/client';
 import type { LiveBoundaryCollection, PanelResponse, PlaceProfile } from '../types/contracts';
-import { CESIUM_ATTRIBUTION, GIBS_ACKNOWLEDGEMENT, OPEN_TERRAIN_SOURCE } from '../cesium/config';
+import { CESIUM_ATTRIBUTION, GIBS_ACKNOWLEDGEMENT, LOCAL_MOSAIC_MANIFESTS, OPEN_TERRAIN_SOURCE, type LocalMosaicManifest } from '../cesium/config';
+import { parseMosaicManifest } from '../cesium/imagery';
 import '../styles/cesium.css';
 
 const PANEL_ORDER = [
@@ -89,6 +90,11 @@ function PanelCard({ domain, panel }: { domain: string; panel: PanelResponse }) 
   );
 }
 
+type MosaicState =
+  | { status: 'loading' }
+  | { status: 'missing' }
+  | { status: 'ready'; manifest: LocalMosaicManifest };
+
 export function GlobePage() {
   const [boundaries, setBoundaries] = useState<LiveBoundaryCollection | null>(null);
   const [boundariesLive, setBoundariesLive] = useState<boolean | null>(null);
@@ -98,8 +104,30 @@ export function GlobePage() {
   const [profileLive, setProfileLive] = useState<boolean | null>(null);
   const [profileState, setProfileState] = useState<'idle' | 'loading' | 'ready'>('idle');
   const [notice, setNotice] = useState<string | null>(null);
+  const [mosaic, setMosaic] = useState<MosaicState>({ status: 'loading' });
 
   const requestSeq = useRef(0);
+
+  // Optional locally generated Sentinel-2 mosaic. A missing or malformed
+  // manifest is an explicit, visible state — never a silent skip or placeholder.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch(LOCAL_MOSAIC_MANIFESTS[0]);
+        if (!resp.ok) throw new Error(`manifest HTTP ${resp.status}`);
+        const manifest = parseMosaicManifest(await resp.json());
+        if (!cancelled) {
+          setMosaic(manifest ? { status: 'ready', manifest } : { status: 'missing' });
+        }
+      } catch {
+        if (!cancelled) setMosaic({ status: 'missing' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -147,7 +175,16 @@ export function GlobePage() {
         setNotice(`No registered place at ${lat.toFixed(3)}, ${lng.toFixed(3)}.`);
         return;
       }
-      await selectPlace(data.id, data.canonical_name);
+      // Outside the supported boundary set the pin is not resolved to a place:
+      // the nearest boundary's profile would describe somewhere else.
+      if (!data.inside_coverage) {
+        setNotice(
+          data.coverage_note ??
+            `${lat.toFixed(3)}, ${lng.toFixed(3)} is outside Garuda's supported boundaries.`,
+        );
+        return;
+      }
+      await selectPlace(data.place.id, data.place.canonical_name);
     },
     [selectPlace],
   );
@@ -260,6 +297,20 @@ export function GlobePage() {
 
         <footer className="globe-sidebar__attribution">
           <p>{GIBS_ACKNOWLEDGEMENT}</p>
+          {mosaic.status === 'ready' && (
+            <p>
+              {mosaic.manifest.attribution_display} — true-colour Sentinel-2 mosaic, locally
+              generated ({mosaic.manifest.mosaic.ground_res_m} m ground resolution) and served
+              same-origin. See ATTRIBUTION.md.
+            </p>
+          )}
+          {mosaic.status === 'missing' && (
+            <p>
+              Local Sentinel-2 mosaic unavailable — it has not been generated on this machine. Run
+              <code> make imagery-build </code>(see docs/imagery-pipeline.md). Base imagery is NASA
+              GIBS.
+            </p>
+          )}
           <p>{OPEN_TERRAIN_SOURCE.attribution}</p>
           <p>{CESIUM_ATTRIBUTION}</p>
           <p>Boundary and profile data: Garuda pilot backend.</p>
@@ -272,6 +323,7 @@ export function GlobePage() {
           selectedId={selectedId}
           onSelectPlace={(placeId, label) => void selectPlace(placeId, label)}
           onReverseGeocode={(lat, lng) => void handleReverseGeocode(lat, lng)}
+          mosaic={mosaic.status === 'ready' ? mosaic.manifest : null}
         />
       </main>
     </div>

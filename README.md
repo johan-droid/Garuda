@@ -43,7 +43,7 @@ Garuda is designed around a strict anti-hallucination contract:
 - **Every metric traces to a published source:** Publisher, license, reference period, and retrieval timestamp are recorded.
 - **Missing data is explicitly labeled:** When data is unavailable, Garuda returns `status: "unavailable"` with documented data gaps, never a silent zero.
 - **Historical data remains historical:** 2011 Census metrics are stamped `Historical (2011)`.
-- **Zero-planned-spend:** Operates locally on SQLite (WAL mode), MapLibre GL JS with CARTO/OSM raster basemaps, and verified open public data fixtures.
+- **Zero-planned-spend:** Operates locally on SQLite (WAL mode), MapLibre GL JS with keyless OpenFreeMap/OSM vector basemaps, and verified open public data fixtures.
 - **Non-clinical public health data:** Official advisories and routine disease surveillance are strictly separated, accompanied by mandatory medical disclaimers.
 
 ---
@@ -242,6 +242,17 @@ Garuda can be run from the root directory using the root `Makefile` or started i
 
 ### Running from Project Root
 
+One command starts both servers; `Ctrl-C` stops both. If a previous instance still holds
+`8000` or `5173`, it is stopped first so the ports never drift (`Vite` runs with `strictPort`).
+
+```bash
+make dev
+# backend  http://localhost:8000  (docs at /docs)
+# frontend http://localhost:5173
+```
+
+Or run them in separate terminals:
+
 ```bash
 # Terminal 1 — Backend API (FastAPI)
 make dev-backend
@@ -417,7 +428,7 @@ Project Garuda adheres strictly to 10 foundational data integrity rules:
 1. **No Hallucination:** Every factual value requires a verified `source_id`, reference period, and published license.
 2. **No Fake Live Data:** Census figures are stamped `Historical (2011)`. Zero unstated interpolations or real-time simulation tickers.
 3. **No Invented Boundaries:** Where village vector polygons do not exist, coordinates and parent units are shown with `geometry_available: false`.
-4. **Zero Planned Spend:** Local SQLite, CARTO raster basemaps, and free open public data sources.
+4. **Zero Planned Spend:** Local SQLite, OpenFreeMap vector basemaps, and free open public data sources.
 5. **No Committed Secrets:** Credentials and real secrets are prohibited from version control.
 6. **No Individual Medical Diagnosis:** Public health cards display institutional surveillance only, with clear disclaimers.
 7. **No Unapproved Public Launch:** Visible watermark: *"DEMO / PILOT MODE — Khordha, Odisha — For Internal & Field Evaluation Only"*.
@@ -448,6 +459,17 @@ make lint
 # Verify TypeScript compilation and Vite production packaging
 make build
 ```
+
+### Frontend Component Tests
+```bash
+# Run the Vitest + Testing Library suite (no backend needed)
+make test-frontend   # or: cd frontend && npm test
+```
+
+These cover the places where the UI must not overstate what the backend knows: the notice
+for a pin outside the supported boundaries, the "not available" card when a profile cannot
+be loaded, and the per-panel status badges. The API client and the map are mocked; everything
+else in `HomePage` runs for real.
 
 ### Test Suite Execution Output
 ```
@@ -516,7 +538,8 @@ Project Garuda source code is released under the **[MIT License](./LICENCE)**.
 ### Data Attributions & Open Licenses
 - **Administrative Boundaries & Population Statistics:** Office of the Registrar General, India / Survey of India — [Government Open Data License (GODL-India)](https://data.gov.in).
 - **Public Health Surveillance & Facility Registers:** Ministry of Health & Family Welfare / National Health Mission Odisha — GODL-India.
-- **Vector Basemap & Map Tiles:** © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL 1.0) | © [CARTO](https://carto.com/) (CC-BY 4.0).
+- **Vector Basemap & Map Tiles:** © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL 1.0) | [OpenFreeMap](https://openfreemap.org) (free keyless instance, OpenMapTiles schema).
+- **Sentinel-2 mosaic (optional 3D globe):** Contains modified Copernicus Sentinel data 2026 (Sentinel Data Legal Notice, attribution required); generated locally from AWS Open Data COGs.
 - **Historical Heritage Records:** Archaeological Survey of India (ASI) — Public domain / open access citations.
 - **Remote Sensing Indicators:** National Remote Sensing Centre (NRSC) / ISRO Bhuvan & Copernicus Sentinel-2.
 - A comprehensive attribution register is maintained in **[ATTRIBUTION.md](./ATTRIBUTION.md)**.

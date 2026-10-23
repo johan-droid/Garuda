@@ -31,6 +31,10 @@ export default defineConfig({
   plugins: [react(), cesiumAssets()],
   server: {
     port: 5173,
+    // The proxy below only exists on this server, so a silent move to 5174
+    // would leave /api unreachable. Fail loudly instead; `make dev` frees the
+    // port before starting.
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',
@@ -44,6 +48,7 @@ export default defineConfig({
   },
   preview: {
     port: 5173,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',

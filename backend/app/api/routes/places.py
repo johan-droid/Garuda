@@ -108,10 +108,18 @@ def boundaries(
 @router.get("/reverse", response_model=ReverseGeocodeResponse, summary="Reverse geocode coordinates")
 def reverse(
     session: SessionDep,
+    response: Response,
     lat: Annotated[float, Query(ge=-90.0, le=90.0, description="Latitude in decimal degrees")],
     lng: Annotated[float, Query(ge=-180.0, le=180.0, description="Longitude in decimal degrees")],
 ) -> ReverseGeocodeResponse:
-    """Reverse geocode coordinates to the closest or enclosing supported place in the pilot hierarchy."""
+    """Reverse geocode coordinates to the closest or enclosing supported place in the pilot hierarchy.
+
+    The response echoes the queried point, so it must not be stored by any
+    cache. `inside_coverage` states whether the point was actually enclosed by
+    a supported boundary; `match_type: nearest` with `inside_coverage: false`
+    is a reference, not a resolution.
+    """
+    response.headers["Cache-Control"] = "no-store"
     try:
         return reverse_geocode(session, lat=lat, lng=lng)
     except ValueError as exc:
@@ -119,15 +127,17 @@ def reverse(
 
 
 @router.get("/{place_id}/profile", response_model=PlaceProfile, summary="Place profile")
-def profile(place_id: PlaceIdPath, session: SessionDep) -> PlaceProfile:
+def profile(place_id: PlaceIdPath, session: SessionDep, response: Response) -> PlaceProfile:
     """Return the multi-panel profile for a place.
 
     Each panel is loaded independently, so a failure in one domain does not
-    prevent the others from being served.
+    prevent the others from being served. The profile answers a specific
+    location query, so it is marked `no-store`.
     """
     result = get_profile(session, place_id)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Place not found.")
+    response.headers["Cache-Control"] = "no-store"
     return result
 
 

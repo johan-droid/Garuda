@@ -1,0 +1,5 @@
+# Sentinel-2 composite imagery pipeline.
+# Requires CPython >= 3.10. Rasterio ships a bundled GDAL on the wheels listed
+# in its install notes; system GDAL is NOT required.
+rasterio>=1.4,<2
+numpy>=1.26,<3

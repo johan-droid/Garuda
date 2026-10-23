@@ -92,6 +92,14 @@ class Observation(BaseModel):
     licence: str | None = None
     notes: str | None = Field(default=None, max_length=1000)
     domain: str | None = None
+    source_url: str | None = Field(
+        default=None,
+        description=(
+            "Link to the record the value came from. Part of provenance: without it a "
+            "reader cannot check the figure, and the freshness rules cannot tell a "
+            "dated source from an undated fixture."
+        ),
+    )
 
 
 class HealthObservation(Observation):
@@ -238,7 +246,13 @@ class ApiError(BaseModel):
 
 
 class ReverseGeocodeResponse(BaseModel):
-    """Result of reverse geocoding a coordinate pair."""
+    """Result of reverse geocoding a coordinate pair.
+
+    `inside_coverage` is the field a client must use before showing a place
+    profile for a pin. False means the pin fell outside every supported
+    boundary and `place` is only the *nearest* supported boundary, provided
+    as a reference; its statistics do not describe the pinned point.
+    """
 
     place: Place
     hierarchy: AdminHierarchy
@@ -246,4 +260,16 @@ class ReverseGeocodeResponse(BaseModel):
     distance_km: float = 0.0
     latitude: float
     longitude: float
+    inside_coverage: bool = Field(
+        default=True,
+        description=(
+            "True only when the point is enclosed by a supported boundary. "
+            "False means `place` is a nearest-boundary reference, not the "
+            "administrative unit containing the point."
+        ),
+    )
+    coverage_note: str | None = Field(
+        default=None,
+        description="Plain-language statement of what the match does and does not mean",
+    )
 

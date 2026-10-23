@@ -48,6 +48,21 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value.astimezone(UTC)
 
 
+def describes_a_point_in_time(observation: Observation) -> bool:
+    """Whether the source says *when* the value applies.
+
+    A value with no reference period, no publication time and no source URL is
+    undated: we fetched it, but nothing states the period it describes. Such a
+    value must not be shown as current (see `determine_status`).
+    """
+    # `getattr`: health views expose a narrower field set than the base model.
+    return bool(
+        getattr(observation, "reference_period_end", None) is not None
+        or getattr(observation, "published_at", None) is not None
+        or getattr(observation, "source_url", None)
+    )
+
+
 def effective_data_time(observation: Observation) -> datetime:
     """Return the moment that best describes how current the observation is.
 
@@ -55,6 +70,10 @@ def effective_data_time(observation: Observation) -> datetime:
       1. `reference_period_end` - the end of the period the fact describes.
       2. `published_at`          - when the source published it.
       3. `retrieved_at`          - when we fetched it (last resort).
+
+    `retrieved_at` is only a fallback ordering key. It says nothing about the
+    period the value describes, which is why `determine_status` refuses to call
+    an undated value current.
     """
     if observation.reference_period_end is not None:
         end = _as_utc(datetime.combine(observation.reference_period_end, datetime.min.time()))
@@ -83,6 +102,12 @@ def determine_status(observation: Observation, now: datetime | None = None) -> D
     stored = observation.quality_status
     if stored in _NON_CURRENT:
         return stored
+
+    # Freshness of an undated value is unknowable. Falling back to
+    # `retrieved_at` would make every freshly ingested figure look current, so
+    # the value is reported as unverified instead.
+    if not describes_a_point_in_time(observation):
+        return DataStatus.UNVERIFIED
 
     domain = _domain_for_observation(observation)
     threshold = max_age_days_for(domain)

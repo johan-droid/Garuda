@@ -108,9 +108,24 @@ backend/backups/
 
 # --- Logs & Process Output -------------------------------------------------
 *.log
+*.log.*
 logs/
 npm-debug.log
 pip-log.txt
+
+# --- Screenshots & Browser Session Captures --------------------------------
+# Visual captures and page dumps are working artifacts, never shipped code.
+.playwright-mcp/
+screenshots/
+**/screenshots/
+*.screenshot.png
+*-screenshot.png
+
+# --- Local-Only Working Notes ----------------------------------------------
+# Audit reports and planning notes stay on the author's machine, not the repo.
+GARUDA_*.md
+docs/plans/
+docs/imagery-pipeline.md
 
 # --- Editor, IDE & Operating System Artifacts ------------------------------
 .vscode/*
@@ -137,3 +152,9 @@ scratch/
 
 # Cesium runtime assets copied from node_modules by vite.config.ts
 frontend/public/cesium/
+
+# Generated Sentinel-2 mosaic tiles (rebuild via: make imagery-build)
+frontend/public/imagery/
+
+# Cached Sentinel-2 band windows (rebuildable, never authoritative source)
+.cache/imagery/

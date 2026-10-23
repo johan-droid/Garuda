@@ -122,6 +122,22 @@ def test_reverse_geocode_enclosing_subdistricts(
     assert body["hierarchy"]["state"] == "Odisha"
     assert body["hierarchy"]["district"] == "Khordha"
     assert body["hierarchy"]["subdistrict"] == expected_subdistrict
+    # A pin inside a supported polygon must be marked as covered, with no
+    # caveat attached.
+    assert body["inside_coverage"] is True
+    assert body["coverage_note"] is None
+
+
+def test_reverse_geocode_resolves_district_when_outside_a_block(client: TestClient) -> None:
+    # Inside the Khordha pilot district outline but outside every block polygon.
+    response = client.get("/api/v1/places/reverse", params={"lat": 19.65, "lng": 85.15})
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["place"]["id"] == "IN-OD-29"
+    assert body["match_type"] == "enclosing"
+    assert body["inside_coverage"] is True
+    assert body["hierarchy"]["district"] == "Khordha"
 
 
 def test_reverse_geocode_outside_all_polygons_falls_back_to_nearest(client: TestClient) -> None:
@@ -133,6 +149,11 @@ def test_reverse_geocode_outside_all_polygons_falls_back_to_nearest(client: Test
     assert body["match_type"] == "nearest"
     assert body["distance_km"] > 500.0  # At least 500 km away
     assert body["place"]["id"] is not None
+    # The nearest boundary is a reference, not the unit containing the pin.
+    assert body["inside_coverage"] is False
+    assert body["coverage_note"]
+    assert "outside" in body["coverage_note"].lower()
+    assert "do not describe" in body["coverage_note"]
 
 
 def test_reverse_geocode_validates_coordinate_bounds(client: TestClient) -> None:
@@ -313,17 +334,17 @@ def test_place_profile_includes_populated_panels(client: TestClient) -> None:
     assert response.status_code == 200
 
     panels = response.json()["panels"]
-    assert panels["demographics"]["status"] in ("historical", "current")
+    # Census 2011 is reference-dated, so its figures are historical - not current.
+    assert panels["demographics"]["status"] == "historical"
     assert len(panels["demographics"]["observations"]) > 0
 
-    assert panels["health"]["status"] in ("historical", "current")
+    assert panels["health"]["status"] == "unverified"
     assert len(panels["health"]["observations"]) > 0
 
-    assert panels["services"]["status"] == "current"
-    assert len(panels["services"]["observations"]) > 0
+    # These panels are populated by undated pilot fixtures. An undated value is
+    # never `current`, however recently it was ingested.
+    for domain in ("services", "environment", "history_culture", "weather_disasters"):
+        assert panels[domain]["status"] == "unverified", domain
+        assert len(panels[domain]["observations"]) > 0, domain
 
-    assert panels["environment"]["status"] == "current"
-    assert len(panels["environment"]["observations"]) > 0
-
-    assert panels["history_culture"]["status"] == "current"
-    assert panels["weather_disasters"]["status"] == "current"
+    assert all(panel["status"] != "current" for panel in panels.values())

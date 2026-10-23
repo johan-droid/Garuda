@@ -1,0 +1,13 @@
+{
+  "region": "odisha-test",
+  "comment": "Cuttack-Bhubaneswar corridor, Odisha. Bounded prototype region; extend by adding new JSON files, never by editing bounds inline.",
+  "bbox": [85.76, 20.36, 85.94, 20.54],
+  "date_range": ["2025-12-01", "2026-02-28"],
+  "stac_endpoint": "https://earth-search.aws.element84.com/v1",
+  "collection": "sentinel-2-l2a",
+  "max_cloud_cover": 15,
+  "max_scenes": 5,
+  "ground_resolution_m": 10,
+  "zoom_levels": [11, 12, 13, 14],
+  "output_dir": "frontend/public/imagery"
+}

@@ -1397,7 +1397,18 @@ export function normalizePlaceProfile(profile: PlaceProfile): PlaceProfile {
   };
 }
 
-export async function getPlaceProfile(placeId: string): Promise<PlaceProfile> {
+/**
+ * Load a place profile.
+ *
+ * Returns null when the backend has no profile for the place. It deliberately
+ * does not synthesise figures: inventing a population, a school count, or a
+ * facility count for an arbitrary place ID would be indistinguishable from
+ * measured data once it reaches the screen.
+ *
+ * `MOCK_PROFILES` is a bundled sample for the pilot IDs only, and the UI only
+ * reaches it when the backend is unreachable, under an explicit offline banner.
+ */
+export async function getPlaceProfile(placeId: string): Promise<PlaceProfile | null> {
   try {
     const res = await fetch(`${API_BASE}/places/${encodeURIComponent(placeId)}/profile`);
     if (res.ok) {
@@ -1408,157 +1419,12 @@ export async function getPlaceProfile(placeId: string): Promise<PlaceProfile> {
     // Backend offline
   }
 
-  // Check fallback mock profiles
-  if (MOCK_PROFILES[placeId]) {
-    return normalizePlaceProfile(MOCK_PROFILES[placeId]);
+  const fixture = MOCK_PROFILES[placeId];
+  if (fixture) {
+    return normalizePlaceProfile(fixture);
   }
 
-  // Generate generic profile from place metadata
-  const place = PILOT_PLACES.find((p) => p.id === placeId) || {
-    id: placeId,
-    canonical_name: placeId,
-    aliases: [],
-    place_type: 'subdistrict' as const,
-    geometry_available: false,
-  };
-
-  // If selecting a known block under Khordha, inherit district context with appropriate attribution
-  return normalizePlaceProfile({
-    place,
-    hierarchy: {
-      state: 'Odisha',
-      district: 'Khordha',
-      subdistrict: place.canonical_name,
-    },
-    retrieved_at: new Date().toISOString(),
-    panels: {
-      demographics: {
-        domain: 'demographics',
-        status: 'historical',
-        coverage_note: 'Aggregated from Census of India 2011 Primary Census Abstract',
-        last_updated: '2026-10-21T00:00:00Z',
-        sources: [
-          {
-            source_id: 'src-census-2011',
-            publisher: 'Office of the Registrar General, India',
-            name: 'Census 2011 PCA',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-21T00:00:00Z',
-            verification_status: 'verified',
-          },
-        ],
-        observations: [
-          {
-            field_name: 'total_population',
-            value: 95420,
-            unit: 'persons (2011)',
-            place_id: place.id,
-            source_id: 'src-census-2011',
-            quality_status: 'historical',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-21T00:00:00Z',
-          },
-          {
-            field_name: 'literacy_rate',
-            value: 82.5,
-            unit: '%',
-            place_id: place.id,
-            source_id: 'src-census-2011',
-            quality_status: 'historical',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-21T00:00:00Z',
-          },
-        ],
-      },
-      health: {
-        domain: 'health',
-        status: 'current',
-        coverage_note: 'Block-level Primary Health Facilities (MoHFW)',
-        last_updated: '2026-10-21T18:00:00Z',
-        sources: [
-          {
-            source_id: 'src-mohfw',
-            publisher: 'NHM Odisha',
-            name: 'Block Health Inventory',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-21T18:00:00Z',
-            verification_status: 'verified',
-          },
-        ],
-        observations: [
-          {
-            field_name: 'primary_health_centres',
-            value: 3,
-            unit: 'facilities',
-            place_id: place.id,
-            source_id: 'src-mohfw',
-            quality_status: 'current',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-21T18:00:00Z',
-          },
-          {
-            field_name: 'community_health_centres',
-            value: 1,
-            unit: 'facilities',
-            place_id: place.id,
-            source_id: 'src-mohfw',
-            quality_status: 'current',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-21T18:00:00Z',
-          },
-        ],
-      },
-      services: {
-        domain: 'services',
-        status: 'current',
-        coverage_note: 'UDISE+ Infrastructure Data',
-        last_updated: '2026-10-20T00:00:00Z',
-        sources: [
-          {
-            source_id: 'src-udise',
-            publisher: 'Ministry of Education',
-            name: 'UDISE+ Index',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-20T00:00:00Z',
-            verification_status: 'verified',
-          },
-        ],
-        observations: [
-          {
-            field_name: 'schools_count',
-            value: 184,
-            unit: 'schools',
-            place_id: place.id,
-            source_id: 'src-udise',
-            quality_status: 'current',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-20T00:00:00Z',
-          },
-          {
-            field_name: 'drinking_water_coverage',
-            value: 84.2,
-            unit: '% households',
-            place_id: place.id,
-            source_id: 'src-udise',
-            quality_status: 'current',
-            licence: 'GODL-India',
-            retrieved_at: '2026-10-20T00:00:00Z',
-          },
-        ],
-      },
-      environment: {
-        domain: 'environment',
-        status: 'unavailable',
-        coverage_note: 'Micro-scale data unavailable',
-        last_updated: null,
-        observations: [],
-        data_gaps: [
-          'No automated air quality monitoring station within this boundary',
-          'Detailed village-level forest canopy parcel data not digitized',
-        ],
-      },
-    },
-  });
+  return null;
 }
 
 export async function checkHealth(): Promise<{ status: string; version: string; pilot_region: string }> {
@@ -1595,7 +1461,14 @@ export async function getBoundaries(): Promise<GeoJsonFeatureCollection> {
   return MOCK_BOUNDARIES;
 }
 
-export async function reverseGeocode(lat: number, lng: number): Promise<Place> {
+/**
+ * Resolve a coordinate through the backend.
+ *
+ * Returns null when the backend is unreachable. It does not guess a place
+ * from a bounding box: a bounding-box guess would place a pin in a district
+ * it may not be in, and the profile that followed would look authoritative.
+ */
+export async function reverseGeocode(lat: number, lng: number): Promise<Place | null> {
   try {
     const res = await fetch(`${API_BASE}/places/reverse?lat=${lat}&lng=${lng}`);
     if (res.ok) {
@@ -1604,52 +1477,9 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Place> {
       if (data.id) return data;
     }
   } catch {
-    // fallback to local spatial resolution
+    // backend unreachable
   }
-
-  // Local spatial resolution using proximity/bounding check
-  let closestPlace: Place | null = null;
-  let minDistance = Infinity;
-
-  // Search through subdistricts and blocks first (higher specificity)
-  const candidatePlaces = PILOT_PLACES.filter((p) => p.place_type !== 'state');
-
-  for (const place of candidatePlaces) {
-    if (!place.coordinates) continue;
-    const [pLat, pLng] = place.coordinates;
-    const dist = Math.hypot(lat - pLat, lng - pLng);
-    if (dist < minDistance) {
-      minDistance = dist;
-      closestPlace = place;
-    }
-  }
-
-  // If within ~15 km (approx 0.15 deg) of a block or town, return that place
-  if (closestPlace && minDistance < 0.15) {
-    return closestPlace;
-  }
-
-  // If inside Khordha district bbox [19.5 - 20.5 lat, 84.9 - 86.1 lng]
-  if (lat >= 19.5 && lat <= 20.5 && lng >= 84.9 && lng <= 86.1) {
-    return PILOT_PLACES[1]; // Khordha District
-  }
-
-  // If inside Odisha bbox [17.5 - 22.8 lat, 81.2 - 87.8 lng]
-  if (lat >= 17.5 && lat <= 22.8 && lng >= 81.2 && lng <= 87.8) {
-    return PILOT_PLACES[0]; // Odisha State
-  }
-
-  // Fallback to point coordinate entity
-  return {
-    id: `point-${lat.toFixed(4)}-${lng.toFixed(4)}`,
-    canonical_name: `Location (${lat.toFixed(3)}°N, ${lng.toFixed(3)}°E)`,
-    aliases: [],
-    place_type: 'point',
-    parent_id: 'IN-OD-29',
-    coordinates: [lat, lng],
-    geometry_available: false,
-    resolution_method: 'coordinate_lookup',
-  };
+  return null;
 }
 
 export async function getSourceDiagnostics(): Promise<SourceDiagnostics> {
@@ -1687,44 +1517,16 @@ export async function getHealthAlerts(placeId: string): Promise<HealthAlertsResp
     return MOCK_HEALTH_ALERTS[placeId];
   }
 
-  // If selecting a subdistrict of Khordha, inherit district-level alert
-  if (placeId.startsWith('IN-OD-')) {
-    return {
-      place_id: placeId,
-      active_alerts: [
-        {
-          id: 'alert-dph-2026-001',
-          field_name: 'Contaminated Water Supply Warning - Daya River Basin',
-          issuing_authority: 'Directorate of Public Health, Government of Odisha',
-          health_category: 'official_alert',
-          severity: 'moderate',
-          disease_code: 'A00 (Cholera / Waterborne Diarrheal Risk)',
-          valid_from: '2026-10-18T00:00:00Z',
-          valid_until: '2026-10-28T23:59:59Z',
-          affected_geography_level: 'district',
-          prevention_link: 'https://www.mohfw.gov.in/prevention-waterborne-diseases',
-          prevention_link_date: '2026-10-18',
-          notes:
-            'Boil drinking water advisory for downstream Daya basin blocks. Chlorination tablets distributed.',
-          expired: false,
-          source_id: 'src-idsp',
-          licence: 'GODL-India',
-          retrieved_at: '2026-10-21T18:00:00Z',
-        },
-      ],
-      expired_count: 1,
-      source_count: 2,
-      note: 'District-level public health advisory active.',
-    };
-  }
-
+  // No alert is invented for an unknown place. "No active alerts" here means
+  // Garuda has no ingested alert for this place, which is weaker than "the
+  // district has issued no advisory" and is worded accordingly.
   return {
     place_id: placeId,
     active_alerts: [],
     expired_alerts: [],
     expired_count: 0,
     source_count: 0,
-    note: 'No active health alerts recorded for this area.',
+    note: 'No health alerts are available from Garuda\'s connected sources for this place.',
   };
 }
 
@@ -1767,16 +1569,44 @@ export async function getPlaceProfileWithProvenance(
   return { data: null, live: false };
 }
 
+/**
+ * Reverse geocode with the coverage verdict the backend supplies.
+ *
+ * `inside_coverage: false` means the returned place is only the nearest
+ * supported boundary, so its profile must not be shown as this pin's data.
+ */
+export interface ReverseGeocodeOutcome {
+  place: Place;
+  inside_coverage: boolean;
+  distance_km: number;
+  coverage_note?: string | null;
+}
+
 export async function reverseGeocodeWithProvenance(
   lat: number,
   lng: number,
-): Promise<LiveData<Place | null>> {
+): Promise<LiveData<ReverseGeocodeOutcome | null>> {
   try {
     const res = await fetch(`${API_BASE}/places/reverse?lat=${lat}&lng=${lng}`);
     if (res.ok) {
       const data = await res.json();
       const place: Place | undefined = data.place ?? (data.id ? data : undefined);
-      if (place) return { data: place, live: true };
+      if (place) {
+        return {
+          data: {
+            place,
+            // Absent field means an older backend: treat as covered only when
+            // the server said the pin was enclosed.
+            inside_coverage:
+              typeof data.inside_coverage === 'boolean'
+                ? data.inside_coverage
+                : data.match_type === 'enclosing',
+            distance_km: typeof data.distance_km === 'number' ? data.distance_km : 0,
+            coverage_note: data.coverage_note ?? null,
+          },
+          live: true,
+        };
+      }
     }
   } catch {
     // backend unreachable

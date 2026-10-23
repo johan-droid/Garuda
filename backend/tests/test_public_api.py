@@ -10,12 +10,15 @@ behaviour a client depends on:
   * ETags allow conditional requests to be answered with `304`.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.domain.common import DataStatus
+from app.domain.contracts import Observation
 from app.models.entities import ObservationModel, SourceModel
+from app.services.freshness import determine_status
 from tests.factories import seed_dataset
 
 
@@ -74,10 +77,47 @@ def test_profile_reports_data_gaps_instead_of_zeros(
     assert services["data_gaps"], "an empty panel must explain the gap"
 
 
+def test_undated_observation_is_never_current() -> None:
+    """No reference period, no publication time, no source URL: not datable.
+
+    Falling back to `retrieved_at` would make every freshly ingested value look
+    current, which is how an undated fixture ends up on screen as an
+    observation of the present.
+    """
+    undated = Observation(
+        field_name="rainfall_daily_mm",
+        value=4.6,
+        unit="mm",
+        place_id="IN-OD-29",
+        source_id="src-imd",
+        quality_status=DataStatus.CURRENT,
+        retrieved_at=datetime.now(UTC),
+    )
+    assert determine_status(undated) == DataStatus.UNVERIFIED
+
+    # A dated value is judged on that date, not on when it was ingested.
+    dated = undated.model_copy(update={"reference_period_end": date.today()})
+    assert determine_status(dated) == DataStatus.CURRENT
+
+    old = undated.model_copy(update={"reference_period_end": date(2011, 2, 28)})
+    assert determine_status(old) == DataStatus.STALE
+
+
 def test_profile_returns_404_for_an_unknown_place(client: TestClient) -> None:
     response = client.get("/api/v1/places/does-not-exist/profile")
 
     assert response.status_code == 404
+
+
+def test_location_responses_are_not_cacheable(client: TestClient, db: Session) -> None:
+    """A response that answers a location query must not be stored by a cache."""
+    seed_dataset(db)
+
+    reverse = client.get("/api/v1/places/reverse", params={"lat": 20.2961, "lng": 85.8245})
+    assert reverse.headers["cache-control"] == "no-store"
+
+    profile = client.get("/api/v1/places/IN-OD/profile")
+    assert profile.headers["cache-control"] == "no-store"
 
 
 def test_profile_panels_carry_their_own_status(client: TestClient, db: Session) -> None:
