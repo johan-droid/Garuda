@@ -106,7 +106,9 @@ export function GlobePage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [mosaic, setMosaic] = useState<MosaicState>({ status: 'loading' });
 
-  const requestSeq = useRef(0);
+  // AbortController for the latest in-flight profile / geocode request.
+  // Replacing it cancels the previous fetch before it can update state.
+  const abortRef = useRef<AbortController | null>(null);
 
   // Optional locally generated Sentinel-2 mosaic. A missing or malformed
   // manifest is an explicit, visible state — never a silent skip or placeholder.
@@ -130,64 +132,82 @@ export function GlobePage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    getBoundariesWithProvenance().then(({ data, live }) => {
-      if (cancelled) return;
+    const ac = new AbortController();
+    getBoundariesWithProvenance(ac.signal).then(({ data, live }) => {
+      if (ac.signal.aborted) return;
       setBoundaries(data);
       setBoundariesLive(live);
-    });
-    return () => {
-      cancelled = true;
-    };
+    }).catch(() => {/* aborted */});
+    return () => { ac.abort(); };
   }, []);
 
   const selectPlace = useCallback(async (placeId: string, label: string) => {
-    const seq = ++requestSeq.current;
+    // Cancel any previous in-flight request.
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
     setSelectedId(placeId);
     setSelectedLabel(label);
     setProfileState('loading');
     setNotice(null);
 
-    const { data, live } = await getPlaceProfileWithProvenance(placeId);
-    if (seq !== requestSeq.current) return;
+    try {
+      const { data, live } = await getPlaceProfileWithProvenance(placeId, ac.signal);
+      if (ac.signal.aborted) return;
 
-    setProfile(data);
-    setProfileLive(live);
-    setProfileState('ready');
-    if (!live) {
-      setNotice('Backend unreachable — no profile loaded. Fixture data is deliberately not shown.');
+      setProfile(data);
+      setProfileLive(live);
+      setProfileState('ready');
+      if (!live) {
+        setNotice('Backend unreachable — no profile loaded. Fixture data is deliberately not shown.');
+      }
+    } catch {
+      // Aborted — new selection is in progress
     }
   }, []);
 
   const handleReverseGeocode = useCallback(
     async (lat: number, lng: number) => {
-      const seq = ++requestSeq.current;
+      // Cancel previous request.
+      abortRef.current?.abort();
+      const ac = new AbortController();
+      abortRef.current = ac;
       setNotice(null);
 
-      const { data, live } = await reverseGeocodeWithProvenance(lat, lng);
-      if (seq !== requestSeq.current) return;
+      try {
+        const { data, live } = await reverseGeocodeWithProvenance(lat, lng, ac.signal);
+        if (ac.signal.aborted) return;
 
-      if (!live) {
-        setNotice('Backend unreachable — this location could not be resolved.');
-        return;
+        if (!live) {
+          setNotice('Backend unreachable — this location could not be resolved.');
+          return;
+        }
+        if (!data) {
+          setNotice(`No registered place at ${lat.toFixed(3)}, ${lng.toFixed(3)}.`);
+          return;
+        }
+        // Outside the supported boundary set the pin is not resolved to a place:
+        // the nearest boundary's profile would describe somewhere else.
+        if (!data.inside_coverage) {
+          setNotice(
+            data.coverage_note ??
+              `${lat.toFixed(3)}, ${lng.toFixed(3)} is outside Garuda's supported boundaries.`,
+          );
+          return;
+        }
+        await selectPlace(data.place.id, data.place.canonical_name);
+      } catch {
+        // Aborted
       }
-      if (!data) {
-        setNotice(`No registered place at ${lat.toFixed(3)}, ${lng.toFixed(3)}.`);
-        return;
-      }
-      // Outside the supported boundary set the pin is not resolved to a place:
-      // the nearest boundary's profile would describe somewhere else.
-      if (!data.inside_coverage) {
-        setNotice(
-          data.coverage_note ??
-            `${lat.toFixed(3)}, ${lng.toFixed(3)} is outside Garuda's supported boundaries.`,
-        );
-        return;
-      }
-      await selectPlace(data.place.id, data.place.canonical_name);
     },
     [selectPlace],
   );
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
 
   const orderedPanels = useMemo(() => {
     if (!profile) return [];
@@ -208,12 +228,12 @@ export function GlobePage() {
       <aside className="globe-sidebar">
         <header className="globe-sidebar__header">
           <div>
-            <h1>Garuda · 3D Terrain</h1>
+            <h1>Garuda</h1>
             <p className="globe-sidebar__subtitle">
-              {OPEN_TERRAIN_SOURCE.label}
+              India Place Intelligence · {OPEN_TERRAIN_SOURCE.label}
             </p>
           </div>
-          <a className="globe-sidebar__back" href="/">
+          <a className="globe-sidebar__back" href="/?map=1">
             ← 2D map
           </a>
         </header>

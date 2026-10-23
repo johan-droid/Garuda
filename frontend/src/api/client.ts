@@ -1506,38 +1506,125 @@ export async function getEnvironmentScenes(
 // These never substitute mock or generated data: when the backend cannot be
 // reached they return `live: false` with empty/null data so the caller can
 // display the real state instead of presenting a fixture as live.
+//
+// Deduplication & caching rationale:
+//   * Boundaries rarely change — one fetch per browser session is fine.
+//     A 5-minute memory cache avoids refetching on every mount.
+//   * Profile fetches are deduplicated: a second call for the same placeId
+//     while the first is in-flight reuses the same Promise.
+//   * AbortSignal is threaded through so the globe can cancel stale fetches
+//     when the user selects a new place before the previous one resolves.
 // ---------------------------------------------------------------------------
 
 export interface LiveData<T> {
   data: T;
   /** True only when the backend answered 2xx with a usable body. */
   live: boolean;
+  /** HTTP status code from the server (absent when offline). */
+  status?: number;
 }
 
-export async function getBoundariesWithProvenance(): Promise<LiveData<LiveBoundaryCollection>> {
-  try {
-    const res = await fetch(`${API_BASE}/places/boundaries`);
-    if (res.ok) {
-      return { data: (await res.json()) as LiveBoundaryCollection, live: true };
-    }
-  } catch {
-    // backend unreachable
+// ---------------------------------------------------------------------------
+// Boundary cache — stable geographic data; 5-minute TTL is long enough to
+// avoid redundant fetches across page interactions without risking stale
+// geometry after a backend redeploy.
+// ---------------------------------------------------------------------------
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number; // Date.now() ms
+}
+
+const _boundaryCache: { entry: CacheEntry<LiveData<LiveBoundaryCollection>> | null } = {
+  entry: null,
+};
+const BOUNDARY_TTL_MS = 5 * 60 * 1_000; // 5 minutes
+
+/** In-flight request deduplication: key → Promise */
+const _inflight = new Map<string, Promise<unknown>>();
+
+export async function getBoundariesWithProvenance(
+  signal?: AbortSignal,
+): Promise<LiveData<LiveBoundaryCollection>> {
+  // Return cached value if still fresh.
+  const now = Date.now();
+  if (_boundaryCache.entry && _boundaryCache.entry.expiresAt > now) {
+    return _boundaryCache.entry.value;
   }
-  return { data: { type: 'FeatureCollection', features: [] }, live: false };
+
+  // Deduplicate concurrent fetches for the same boundary set.
+  const key = 'boundaries';
+  const existing = _inflight.get(key) as Promise<LiveData<LiveBoundaryCollection>> | undefined;
+  if (existing) return existing;
+
+  const promise: Promise<LiveData<LiveBoundaryCollection>> = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/places/boundaries`, { signal });
+      if (res.ok) {
+        const result: LiveData<LiveBoundaryCollection> = {
+          data: (await res.json()) as LiveBoundaryCollection,
+          live: true,
+          status: res.status,
+        };
+        _boundaryCache.entry = { value: result, expiresAt: Date.now() + BOUNDARY_TTL_MS };
+        return result;
+      }
+      // 429 → surface it; don't cache
+      return {
+        data: { type: 'FeatureCollection', features: [] } as LiveBoundaryCollection,
+        live: false,
+        status: res.status,
+      };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      return { data: { type: 'FeatureCollection', features: [] }, live: false };
+    } finally {
+      _inflight.delete(key);
+    }
+  })();
+
+  _inflight.set(key, promise);
+  return promise;
+}
+
+/** Invalidate the boundary cache (e.g. after a backend redeploy). */
+export function invalidateBoundaryCache(): void {
+  _boundaryCache.entry = null;
 }
 
 export async function getPlaceProfileWithProvenance(
   placeId: string,
+  signal?: AbortSignal,
 ): Promise<LiveData<PlaceProfile | null>> {
-  try {
-    const res = await fetch(`${API_BASE}/places/${encodeURIComponent(placeId)}/profile`);
-    if (res.ok) {
-      return { data: normalizePlaceProfile((await res.json()) as PlaceProfile), live: true };
+  // Deduplicate concurrent fetches for the same placeId.
+  const key = `profile:${placeId}`;
+  const existing = _inflight.get(key) as
+    | Promise<LiveData<PlaceProfile | null>>
+    | undefined;
+  if (existing) return existing;
+
+  const promise: Promise<LiveData<PlaceProfile | null>> = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/places/${encodeURIComponent(placeId)}/profile`, {
+        signal,
+      });
+      if (res.ok) {
+        return {
+          data: normalizePlaceProfile((await res.json()) as PlaceProfile),
+          live: true,
+          status: res.status,
+        };
+      }
+      return { data: null, live: false, status: res.status };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      return { data: null, live: false };
+    } finally {
+      _inflight.delete(key);
     }
-  } catch {
-    // backend unreachable
-  }
-  return { data: null, live: false };
+  })();
+
+  _inflight.set(key, promise);
+  return promise;
 }
 
 /**
@@ -1556,31 +1643,49 @@ export interface ReverseGeocodeOutcome {
 export async function reverseGeocodeWithProvenance(
   lat: number,
   lng: number,
+  signal?: AbortSignal,
 ): Promise<LiveData<ReverseGeocodeOutcome | null>> {
-  try {
-    const res = await fetch(`${API_BASE}/places/reverse?lat=${lat}&lng=${lng}`);
-    if (res.ok) {
-      const data = await res.json();
-      const place: Place | undefined = data.place ?? (data.id ? data : undefined);
-      if (place) {
-        return {
-          data: {
-            place,
-            // Absent field means an older backend: treat as covered only when
-            // the server said the pin was enclosed.
-            inside_coverage:
-              typeof data.inside_coverage === 'boolean'
-                ? data.inside_coverage
-                : data.match_type === 'enclosing',
-            distance_km: typeof data.distance_km === 'number' ? data.distance_km : 0,
-            coverage_note: data.coverage_note ?? null,
-          },
-          live: true,
-        };
+  // Deduplicate coordinate lookups rounded to 5 decimal places (~1 m precision).
+  const roundedLat = lat.toFixed(5);
+  const roundedLng = lng.toFixed(5);
+  const key = `rgc:${roundedLat},${roundedLng}`;
+  const existing = _inflight.get(key) as
+    | Promise<LiveData<ReverseGeocodeOutcome | null>>
+    | undefined;
+  if (existing) return existing;
+
+  const promise: Promise<LiveData<ReverseGeocodeOutcome | null>> = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/places/reverse?lat=${lat}&lng=${lng}`, { signal });
+      if (res.ok) {
+        const data = await res.json();
+        const place: Place | undefined = data.place ?? (data.id ? data : undefined);
+        if (place) {
+          return {
+            data: {
+              place,
+              inside_coverage:
+                typeof data.inside_coverage === 'boolean'
+                  ? data.inside_coverage
+                  : data.match_type === 'enclosing',
+              distance_km: typeof data.distance_km === 'number' ? data.distance_km : 0,
+              coverage_note: data.coverage_note ?? null,
+            },
+            live: true,
+            status: res.status,
+          };
+        }
       }
+      return { data: null, live: res.status < 500, status: res.status };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
+      return { data: null, live: false };
+    } finally {
+      _inflight.delete(key);
     }
-  } catch {
-    // backend unreachable
-  }
-  return { data: null, live: false };
+  })();
+
+  _inflight.set(key, promise);
+  return promise;
 }
+

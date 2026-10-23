@@ -3,6 +3,10 @@ import {
   getEnvironmentScenes,
   getHealthAlerts,
   normalizePlaceProfile,
+  getBoundariesWithProvenance,
+  getPlaceProfileWithProvenance,
+  reverseGeocodeWithProvenance,
+  invalidateBoundaryCache,
 } from './client';
 import { PlaceProfile } from '../types/contracts';
 
@@ -11,6 +15,8 @@ describe('client API honesty & contract tests', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Flush boundary cache between tests so each test starts clean.
+    invalidateBoundaryCache();
   });
 
   afterEach(() => {
@@ -146,4 +152,117 @@ describe('client API honesty & contract tests', () => {
       expect(normalized.panels.weather_disasters).toBe(normalized.panels.weather);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Deduplication, caching and abort tests
+  // ---------------------------------------------------------------------------
+
+  describe('getBoundariesWithProvenance – boundary cache and deduplication', () => {
+    it('fetches only once when called concurrently (in-flight deduplication)', async () => {
+      const mockBoundaries = { type: 'FeatureCollection', features: [] };
+      let resolveFirst!: () => void;
+      const latch = new Promise<void>((res) => { resolveFirst = res; });
+
+      globalThis.fetch = vi.fn().mockReturnValue(
+        latch.then(() => ({
+          ok: true,
+          json: async () => mockBoundaries,
+        }) as Response)
+      );
+
+      // Fire two concurrent calls before the first resolves.
+      const [r1, r2] = await Promise.all([
+        getBoundariesWithProvenance(),
+        (resolveFirst(), getBoundariesWithProvenance()),
+      ]);
+
+      // Only one network request should have been made.
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(r1.live).toBe(true);
+      expect(r2.live).toBe(true);
+    });
+
+    it('returns cached result on the second call without a new fetch', async () => {
+      const mockBoundaries = { type: 'FeatureCollection', features: [{ id: 'cached' }] };
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockBoundaries,
+      } as Response);
+
+      await getBoundariesWithProvenance();
+      await getBoundariesWithProvenance();
+
+      // Second call should use the cache: only one fetch.
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('surfaces HTTP 429 as live:false with status code', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+      } as Response);
+
+      const result = await getBoundariesWithProvenance();
+
+      expect(result.live).toBe(false);
+      expect(result.status).toBe(429);
+    });
+  });
+
+  describe('getPlaceProfileWithProvenance – deduplication and abort', () => {
+    it('deduplicates concurrent fetches for the same placeId', async () => {
+      const mockProfile = {
+        place: { id: 'IN-OD-29', canonical_name: 'Khordha', aliases: [], place_type: 'district', geometry_available: true },
+        hierarchy: {},
+        panels: {},
+      };
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockProfile,
+      } as Response);
+
+      const [r1, r2] = await Promise.all([
+        getPlaceProfileWithProvenance('IN-OD-29'),
+        getPlaceProfileWithProvenance('IN-OD-29'),
+      ]);
+
+      // Only one network request for the same placeId.
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(r1.live).toBe(true);
+      expect(r2.live).toBe(true);
+    });
+
+    it('returns live:false and status code on HTTP 429', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+      } as Response);
+
+      const result = await getPlaceProfileWithProvenance('IN-OD-RATE-LIMITED');
+      expect(result.live).toBe(false);
+      expect(result.status).toBe(429);
+      expect(result.data).toBeNull();
+    });
+  });
+
+  describe('reverseGeocodeWithProvenance – coordinate deduplication', () => {
+    it('deduplicates requests for the same rounded coordinate', async () => {
+      // Invalidate any cached request
+      invalidateBoundaryCache();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      } as Response);
+
+      // Two slightly different coordinates that round to the same 5dp value
+      await Promise.all([
+        reverseGeocodeWithProvenance(20.29610, 85.82450),
+        reverseGeocodeWithProvenance(20.29610, 85.82450),
+      ]);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
 });
+
