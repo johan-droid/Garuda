@@ -4,6 +4,8 @@
 
 Garuda provides deterministic, source-grounded place intelligence across India's administrative levels. From state down to village and coordinate level, users can search, inspect, and analyze multi-domain metrics without hallucinated defaults or unverified extrapolations.
 
+> **New to the repository?** Read **[docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md)** first: it states what is actually built, what is still fixture, and what remains — the fast path for developers and AI agents alike.
+
 ---
 
 ## Table of Contents
@@ -550,9 +552,10 @@ Project Garuda source code is released under the **[MIT License](./LICENCE)**.
 
 | Document | Purpose |
 |:---|:---|
+| 🦅 **[docs/PROJECT_STATE.md](./docs/PROJECT_STATE.md)** | **Current state:** progression, what is real vs fixture, open work, rules for contributors and agents |
 | 📖 **[docs/PRODUCTION.md](./docs/PRODUCTION.md)** | Unified Master Production, Deployment & Operations Manual |
 | 🛠️ **[docs/SETUP.md](./docs/SETUP.md)** | Detailed local setup guide for Linux, macOS, and Windows |
-| 📋 **[docs/PILOT_VERIFICATION_REPORT.md](./docs/PILOT_VERIFICATION_REPORT.md)** | Formal audit of Khordha pilot against 10 Non-Negotiable Principles |
+| 📋 **[docs/PILOT_VERIFICATION_REPORT.md](./docs/PILOT_VERIFICATION_REPORT.md)** | Pilot audit from 2026-10-22. Superseded by `PROJECT_STATE.md` §5 — its "grounded seven domains" claim predates the fixture findings |
 | 🗺️ **[docs/phases/](./docs/phases)** | Stage-wise implementation roadmap (Phases 00 through 10) |
 | 📜 **[docs/source-register/](./docs/source-register)** | Data source evaluations, blocker logs, and licensing register |
 | 📑 **[docs/India_Place_Intelligence_Platform_Development_Plan.pdf](./docs/India_Place_Intelligence_Platform_Development_Plan.pdf)** | Original master blueprint and system specification |
