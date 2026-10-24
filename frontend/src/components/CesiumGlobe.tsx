@@ -98,6 +98,11 @@ export function CesiumGlobe({
 
     addImageryLayers(viewer);
 
+    // Nadir framing keeps the globe fully visible and centered in the map
+    // viewport regardless of sidebar/toolbar width. A tilted initial camera
+    // (e.g. pitch -55°) pushes the horizon across the window and crops the
+    // planet off-screen at both edges; the "India"/"Odisha" presets below keep
+    // their tilt for deliberate close-ups.
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(
         CAMERAS.india.longitude,
@@ -106,10 +111,14 @@ export function CesiumGlobe({
       ),
       orientation: {
         heading: 0,
-        pitch: Cesium.Math.toRadians(-55),
+        pitch: Cesium.Math.toRadians(-90),
         roll: 0,
       },
     });
+
+    // Cesium's default allows an infinite zoom-out distance, which lets the
+    // camera retreat until the globe is a dot on an unusable view.
+    viewer.scene.screenSpaceCameraController.maximumZoomDistance = 40_000_000;
 
     // Non-null only for a real terrain provider; silence would hide provider failure.
     const removeTerrainErrorListener = terrain.errorEvent?.addEventListener(
