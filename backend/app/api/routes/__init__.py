@@ -6,6 +6,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.observations import router as observations_router
 from app.api.routes.places import router as places_router
 from app.api.routes.sources import router as sources_router
+from app.api.routes.weather import router as weather_router
 
 __all__ = [
     "admin_router",
@@ -14,4 +15,5 @@ __all__ = [
     "observations_router",
     "places_router",
     "sources_router",
+    "weather_router",
 ]
