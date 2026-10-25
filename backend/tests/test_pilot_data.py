@@ -14,10 +14,13 @@ Covers:
       * Weather & Disasters (IMD observation, NDMA advisory)
 """
 
+from urllib.parse import urlparse
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.models.entities import ObservationModel, SourceModel
 from seed_pilot import seed_database
 
 
@@ -30,6 +33,7 @@ def _setup_pilot_data(db: Session) -> None:
 # =============================================================================
 # 1. BOUNDARIES ENDPOINT (/api/v1/places/boundaries)
 # =============================================================================
+
 
 def test_boundaries_returns_full_pilot_feature_collection(client: TestClient) -> None:
     response = client.get("/api/v1/places/boundaries")
@@ -95,6 +99,7 @@ def test_boundaries_have_valid_polygon_geometries(client: TestClient) -> None:
 # =============================================================================
 # 2. REVERSE GEOCODING ENDPOINT (/api/v1/places/reverse)
 # =============================================================================
+
 
 @pytest.mark.parametrize(
     ("lat", "lng", "expected_place_id", "expected_subdistrict"),
@@ -170,6 +175,7 @@ def test_reverse_geocode_validates_coordinate_bounds(client: TestClient) -> None
 # 3. SOURCE DIAGNOSTICS ENDPOINT (/api/v1/sources/diagnostics)
 # =============================================================================
 
+
 def test_source_diagnostics_reports_all_registered_sources(client: TestClient) -> None:
     response = client.get("/api/v1/sources/diagnostics")
     assert response.status_code == 200
@@ -218,6 +224,7 @@ def test_source_diagnostics_ttls_match_data_domain_policies(client: TestClient) 
 # =============================================================================
 # 4. SEEDED OBSERVATIONS ACROSS ALL REQUIRED DOMAINS
 # =============================================================================
+
 
 def test_demographics_observations(client: TestClient) -> None:
     # Query Khordha District observations
@@ -348,3 +355,72 @@ def test_place_profile_includes_populated_panels(client: TestClient) -> None:
         assert len(panels[domain]["observations"]) > 0, domain
 
     assert all(panel["status"] != "current" for panel in panels.values())
+
+
+# =============================================================================
+# 8. PROVENANCE LINKS (source_url) AND THE UNDATED GUARD
+# =============================================================================
+
+
+def test_every_seeded_observation_links_to_its_registered_source(db: Session) -> None:
+    """Every observation must be traceable to the record it came from.
+
+    `source_url` is what the provenance drawer sends the reader to. A value
+    with no link is a claim with no evidence behind it.
+    """
+    observations = db.query(ObservationModel).all()
+    assert len(observations) == 103
+
+    sources = {s.id: s.url for s in db.query(SourceModel).all()}
+    unlinked = [o.field_name for o in observations if not o.source_url]
+    assert not unlinked, f"observations with no source_url: {unlinked}"
+
+    for obs in observations:
+        parsed = urlparse(obs.source_url)
+        assert parsed.scheme in ("http", "https"), obs.field_name
+        assert parsed.netloc, obs.field_name
+        # The link may only ever point at a host the sources table vouches for.
+        registered = urlparse(sources[obs.source_id])
+        assert parsed.netloc == registered.netloc, (
+            f"{obs.field_name} links to {parsed.netloc}, but {obs.source_id} is registered at {registered.netloc}"
+        )
+
+
+def test_profile_serves_source_url_on_every_observation(client: TestClient) -> None:
+    """The API must actually hand the link to the frontend."""
+    response = client.get("/api/v1/places/IN-OD-29/profile")
+    assert response.status_code == 200
+
+    seen = 0
+    for panel in response.json()["panels"].values():
+        for obs in panel["observations"]:
+            seen += 1
+            assert obs["source_url"], f"{obs['field_name']} served without source_url"
+            assert obs["source_id"]
+    assert seen > 0
+
+
+def test_undated_seeded_values_are_never_reported_current(client: TestClient) -> None:
+    """Populating `source_url` must not promote an undated fixture to `current`.
+
+    43 of the 103 seeded rows carry no reference period and no publication
+    time. They are illustrative panel filler and are stored `unverified`.
+    Attaching a publisher link says where the value came from, not what period
+    it describes, so none of them may be presented as an observation of the
+    present.
+    """
+    response = client.get("/api/v1/places/IN-OD-29/profile")
+    assert response.status_code == 200
+
+    undated = [
+        obs
+        for panel in response.json()["panels"].values()
+        for obs in panel["observations"]
+        if obs["reference_period_end"] is None and obs["published_at"] is None
+    ]
+    assert undated, "expected undated pilot fixtures in this place"
+    for obs in undated:
+        assert obs["source_url"], f"{obs['field_name']} should carry provenance"
+        assert obs["quality_status"] == "unverified", (
+            f"{obs['field_name']} is undated but reported {obs['quality_status']}"
+        )

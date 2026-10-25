@@ -284,6 +284,14 @@ def seed_database(session: Session) -> dict[str, int]:
     census_period_start = date(2011, 2, 9)
     census_period_end = date(2011, 2, 28)
 
+    # Every observation links back to the URL its source is registered under,
+    # so the provenance drawer can send the reader somewhere real. Derived from
+    # `sources_data` rather than a parallel map: one source of truth, and the
+    # link can never name a host the sources table does not vouch for.
+    # ponytail: publisher root URL, not a per-dataset landing page — add a
+    # landing_page column to SourceModel once deep links are verified.
+    source_urls = {s.id: s.url for s in sources_data}
+
     # Helper to check if an observation already exists
     def add_obs_if_missing(model_instance: ObservationModel) -> None:
         existing = (
@@ -297,6 +305,8 @@ def seed_database(session: Session) -> dict[str, int]:
             .first()
         )
         if not existing:
+            if model_instance.source_url is None:
+                model_instance.source_url = source_urls.get(model_instance.source_id)
             session.add(model_instance)
 
     # 4A. DEMOGRAPHICS (Census 2011)
@@ -633,9 +643,27 @@ def seed_database(session: Session) -> dict[str, int]:
     # 4E. ENVIRONMENT (ISRO/NRSC Bhuvan & Sentinel Satellite Layers)
     env_data = [
         ("forest_cover_pct", 21.84, "%", "IN-OD-29", "Forest cover percentage across Chandaka and Barbara reserves."),
-        ("chilika_water_spread_area_sq_km", 1165.0, "sq km", "IN-OD-29", "Peak seasonal open water spread of Chilika lagoon (IRS-LISS)."),
-        ("air_quality_index_baseline", 64.0, "AQI", "IN-OD-29", "Ambient PM2.5/PM10 air quality baseline in Khordha-Bhubaneswar corridor."),
-        ("chilika_water_spread_area_sq_km", 1165.0, "sq km", "IN-OD-CHI", "Chilika lake body surface area monitored via Bhuvan."),
+        (
+            "chilika_water_spread_area_sq_km",
+            1165.0,
+            "sq km",
+            "IN-OD-29",
+            "Peak seasonal open water spread of Chilika lagoon (IRS-LISS).",
+        ),
+        (
+            "air_quality_index_baseline",
+            64.0,
+            "AQI",
+            "IN-OD-29",
+            "Ambient PM2.5/PM10 air quality baseline in Khordha-Bhubaneswar corridor.",
+        ),
+        (
+            "chilika_water_spread_area_sq_km",
+            1165.0,
+            "sq km",
+            "IN-OD-CHI",
+            "Chilika lake body surface area monitored via Bhuvan.",
+        ),
     ]
 
     for field, val, unit, pid, note in env_data:
@@ -704,12 +732,18 @@ def seed_database(session: Session) -> dict[str, int]:
     )
 
     # An undated value must never read as current. Some pilot figures below are
-    # illustrative: they carry no reference period and no source URL, so the
-    # freshness rules cannot establish when they describe. They are kept so the
-    # panels render, but stored as `unverified` so no read path presents them as
-    # an observation of the present.
+    # illustrative: they carry no reference period and no publication time, so
+    # the freshness rules cannot establish when they describe. They are kept so
+    # the panels render, but stored as `unverified` so no read path presents
+    # them as an observation of the present. The publisher link attached above
+    # says where a value came from, not what period it describes, so it is
+    # deliberately not part of this test.
+    session.flush()  # pending inserts must be visible to the query below
     for row in session.query(ObservationModel).all():
-        if row.reference_period_end is None and row.published_at is None and not row.source_url:
+        # Backfill rows seeded before provenance links were attached.
+        if row.source_url is None:
+            row.source_url = source_urls.get(row.source_id)
+        if row.reference_period_end is None and row.published_at is None:
             row.quality_status = "unverified"
             if not row.notes:
                 row.notes = "Pilot fixture value with no reference period; not a published measurement."
