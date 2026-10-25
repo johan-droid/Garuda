@@ -40,6 +40,7 @@ def _reset_database() -> None:
 def _schema() -> Iterator[None]:
     """Create the schema once for the whole test session."""
     import app.models.entities  # noqa: F401  (registers the mappers)
+    import app.models.saved_place  # noqa: F401  (not reachable via entities)
 
     Base.metadata.create_all(bind=engine)
     yield

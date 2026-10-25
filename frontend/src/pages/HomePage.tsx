@@ -8,6 +8,9 @@ import {
   getHealthAlerts,
   getSourceDiagnostics,
   getEnvironmentScenes,
+  getSavedPlaces,
+  savePlace,
+  removeSavedPlace,
   PILOT_PLACES,
 } from '../api/client';
 import {
@@ -76,10 +79,30 @@ export const HomePage: React.FC = () => {
   const [mapNotice, setMapNotice] = useState<string | null>(null);
   const [environmentScene, setEnvironmentScene] = useState<LatestObservationResponse | null>(null);
 
-  // Bookmarks live for the session only. Persisting them in browser storage
-  // would retain the places a person inspected, which Garuda's no-retention
-  // contract forbids.
-  const [savedPlaces, setSavedPlaces] = useState<Place[]>([PILOT_PLACES[1], PILOT_PLACES[2]]);
+  // Bookmarks are held by the server, not the browser. Keeping them in
+  // localStorage would show the next person to pick up a shared phone which
+  // places were looked at, so the only thing stored locally is the opaque id
+  // that namespaces them. An unreachable backend means no bar, not a guessed
+  // one.
+  const [savedPlaces, setSavedPlaces] = useState<Place[]>([]);
+
+  // Load this browser's saved places once on mount. The list is scoped to the
+  // browser id, not to the selected place, so a place change does not need a
+  // refetch - and an unreachable backend yields an empty list rather than a
+  // guessed one.
+  const refreshSavedPlaces = async () => {
+    try {
+      setSavedPlaces(await getSavedPlaces());
+    } catch (err) {
+      console.error('Could not load saved places:', err);
+      setSavedPlaces([]);
+    }
+  };
+
+  useEffect(() => {
+    refreshSavedPlaces();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Check health and online status
   useEffect(() => {
@@ -180,15 +203,25 @@ export const HomePage: React.FC = () => {
   };
 
   // Toggle Bookmark
+  //
+  // The server is the source of truth, so the local list is only updated once
+  // it accepts the change. Optimistically adding a bookmark the server refused
+  // would show a chip that is not there after a reload.
   const isBookmarked = savedPlaces.some((p) => p.id === selectedPlace.id);
-  const handleToggleBookmark = () => {
-    let updated: Place[];
-    if (isBookmarked) {
-      updated = savedPlaces.filter((p) => p.id !== selectedPlace.id);
-    } else {
-      updated = [...savedPlaces, selectedPlace];
+  const handleToggleBookmark = async () => {
+    try {
+      if (isBookmarked) {
+        await removeSavedPlace(selectedPlace.id);
+        setSavedPlaces(savedPlaces.filter((p) => p.id !== selectedPlace.id));
+      } else {
+        await savePlace(selectedPlace);
+        setSavedPlaces([...savedPlaces, selectedPlace]);
+      }
+    } catch (err) {
+      // Leave the list as it is: the bookmark did not change server-side, so
+      // showing it as changed would be the dishonest outcome.
+      console.error('Could not update bookmark:', err);
     }
-    setSavedPlaces(updated);
   };
 
   // Open Diagnostics Modal

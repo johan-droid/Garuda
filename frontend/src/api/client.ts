@@ -1689,3 +1689,99 @@ export async function reverseGeocodeWithProvenance(
   return promise;
 }
 
+// ---------------------------------------------------------------------------
+// Saved places — server-side bookmarks.
+//
+// Bookmarks are deliberately not kept in browser storage for their *content*:
+// this pilot runs on shared phones, and localStorage would show the next
+// person to pick the device up which places were looked at. The server holds
+// the bookmarks; what is stored locally is only the opaque namespace id that
+// decides whose bookmarks to ask for.
+//
+// The id is generated here rather than read from a cookie, so there is no
+// cross-site tracking surface and no account. It is stable for the browser
+// profile, which is what makes a reload find the same bookmarks.
+// ---------------------------------------------------------------------------
+
+const CLIENT_ID_KEY = 'garuda-client-id';
+
+/**
+ * The opaque id that namespaces this browser's bookmarks.
+ *
+ * Persisted so a reload finds the same saved places. Random per profile, not
+ * derived from anything else - it is a namespace, not an identity.
+ */
+export function getClientId(): string {
+  let id = window.localStorage.getItem(CLIENT_ID_KEY);
+  if (!id) {
+    id = globalThis.crypto?.randomUUID
+      ? globalThis.crypto.randomUUID()
+      : `client-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+    window.localStorage.setItem(CLIENT_ID_KEY, id);
+  }
+  return id;
+}
+
+function savedPlacesHeaders(): Record<string, string> {
+  return {
+    'X-Client-Id': getClientId(),
+    'Content-Type': 'application/json',
+  };
+}
+
+/**
+ * The places this browser has saved.
+ *
+ * An unreachable backend resolves to an empty list rather than throwing: the
+ * honest state is "nothing is known to be saved", and showing bookmarks the
+ * server does not have would misreport them.
+ */
+export async function getSavedPlaces(): Promise<Place[]> {
+  try {
+    const res = await fetch(`${API_BASE}/saved-places`, {
+      headers: savedPlacesHeaders(),
+    });
+    if (res.ok) {
+      return (await res.json()) as Place[];
+    }
+  } catch {
+    // Backend offline / network failure
+  }
+  return [];
+}
+
+/**
+ * Save a place for this browser.
+ *
+ * Rejects on any non-2xx, including a 5xx from an offline backend, so the
+ * caller can leave its own state unchanged: a bookmark the server never
+ * stored must not be shown as saved.
+ */
+export async function savePlace(place: Place): Promise<void> {
+  const res = await fetch(`${API_BASE}/saved-places`, {
+    method: 'POST',
+    headers: savedPlacesHeaders(),
+    body: JSON.stringify(place),
+  });
+  if (!res.ok) {
+    throw new Error(`Could not save place (HTTP ${res.status})`);
+  }
+}
+
+/**
+ * Remove one of this browser's saved places.
+ *
+ * A 404 rejects rather than resolving: the bookmark was already gone, and a
+ * caller that treats that as success would report a removal that never
+ * happened.
+ */
+export async function removeSavedPlace(placeId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/saved-places/${encodeURIComponent(placeId)}`, {
+    method: 'DELETE',
+    headers: savedPlacesHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`Could not remove place (HTTP ${res.status})`);
+  }
+}
+

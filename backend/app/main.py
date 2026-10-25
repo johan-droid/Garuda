@@ -22,7 +22,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin, environment_scenes, observations, places, sources, weather
+from app.api.routes import admin, environment_scenes, observations, places, saved_places, sources, weather
 from app.api.routes.health import router as health_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
@@ -78,7 +78,9 @@ def create_app() -> FastAPI:
         allow_origins=settings.ALLOWED_ORIGINS,
         allow_origin_regex=settings.ALLOWED_ORIGINS_REGEX,
         allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        # DELETE is here because removing a saved place is a real request;
+        # without it a cross-origin client would be refused at preflight.
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["*"],
         expose_headers=[
             "ETag",
@@ -105,6 +107,7 @@ def create_app() -> FastAPI:
     app.include_router(environment_scenes.router, prefix=settings.API_V1_STR)
     app.include_router(observations.router, prefix=settings.API_V1_STR)
     app.include_router(weather.router, prefix=settings.API_V1_STR)
+    app.include_router(saved_places.router, prefix=settings.API_V1_STR)
     app.include_router(admin.router, prefix=settings.API_V1_STR)
 
     @app.get("/", include_in_schema=False)

@@ -14,6 +14,9 @@ if str(API_ROOT) not in sys.path:
 from sqlalchemy.engine import Engine  # noqa: E402
 
 import app.models.entities  # noqa: E402, F401  (registers all entity mappings)
+# Registered explicitly: this module is not reachable from entities, and a
+# metadata built without it silently omits the table from `make init-db`.
+import app.models.saved_place  # noqa: E402, F401
 from app.db.session import Base, engine  # noqa: E402
 
 

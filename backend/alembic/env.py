@@ -15,6 +15,9 @@ if str(BACKEND_DIR) not in sys.path:
 
 # Import application DeclarativeBase, engine, and registered entities
 import app.models.entities  # noqa: F401 (registers all entities on Base.metadata)
+# Registered explicitly: not reachable from entities, and a metadata built
+# without it makes autogenerate silently omit the table.
+import app.models.saved_place  # noqa: F401
 from app.core.config import settings
 from app.db.session import Base, engine as app_engine
 
