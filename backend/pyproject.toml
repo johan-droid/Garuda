@@ -13,6 +13,14 @@ dependencies = [
     "python-dotenv>=1.0",
 ]
 
+# Without this the package cannot be installed at all: setuptools discovers
+# `app`, `data` and `alembic` as top-level packages in a flat layout and
+# refuses to build. Only `app*` is the package; `data` (fixtures) and `alembic`
+# (migrations) are not importable code. This is what `pip install -e .` in CI
+# and the Dockerfile rely on.
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
