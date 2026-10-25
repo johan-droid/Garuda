@@ -687,8 +687,8 @@ export const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* Health Domain Panel */}
-              {panels.health && (
+              {/* Health Domain Panel — unverified panels show no figures */}
+              {panels.health && panels.health.status !== 'unverified' && (
                 <div className="card">
                   <div className="card-title">
                     <span>Public Health & Surveillance</span>
@@ -767,8 +767,8 @@ export const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* Public Services & Education Panel */}
-              {panels.services && (
+              {/* Public Services & Education Panel — unverified panels show no figures */}
+              {panels.services && panels.services.status !== 'unverified' && (
                 <div className="card">
                   <div className="card-title">
                     <span>Public Services & Education</span>
@@ -822,8 +822,8 @@ export const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* History & Culture Panel */}
-              {panels.culture && panels.culture.status !== 'unavailable' && (
+              {/* History & Culture Panel — unverified panels show no figures */}
+              {panels.culture && panels.culture.status !== 'unavailable' && panels.culture.status !== 'unverified' && (
                 <div className="card">
                   <div className="card-title">
                     <span>History & Heritage Sites</span>
@@ -864,8 +864,8 @@ export const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* Environment & Satellite Panel */}
-              {panels.environment && panels.environment.status !== 'unavailable' && (
+              {/* Environment & Satellite Panel — unverified panels show no figures */}
+              {panels.environment && panels.environment.status !== 'unavailable' && panels.environment.status !== 'unverified' && (
                 <div className="card">
                   <div className="card-title">
                     <span>Environment & Satellite Imagery</span>
@@ -977,8 +977,8 @@ export const HomePage: React.FC = () => {
                 </div>
               )}
 
-              {/* Weather & Climate Observations */}
-              {panels.weather && panels.weather.status !== 'unavailable' && (
+              {/* Weather & Climate Observations — unverified panels show no figures */}
+              {panels.weather && panels.weather.status !== 'unavailable' && panels.weather.status !== 'unverified' && (
                 <div className="card">
                   <div className="card-title">
                     <span>Weather & Meteorological Observations</span>

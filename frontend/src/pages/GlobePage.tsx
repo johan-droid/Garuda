@@ -8,7 +8,7 @@ import {
 } from '../api/client';
 import type { LiveBoundaryCollection, PanelResponse, PlaceProfile } from '../types/contracts';
 import { CESIUM_ATTRIBUTION, GIBS_ACKNOWLEDGEMENT, LOCAL_MOSAIC_MANIFESTS, OPEN_TERRAIN_SOURCE, type LocalMosaicManifest } from '../cesium/config';
-import { parseMosaicManifest } from '../cesium/imagery';
+import { parseMosaicManifest, imageryTemporalLabel } from '../cesium/imagery';
 import '../styles/cesium.css';
 
 const PANEL_ORDER = [
@@ -317,6 +317,7 @@ export function GlobePage() {
 
         <footer className="globe-sidebar__attribution">
           <p>{GIBS_ACKNOWLEDGEMENT}</p>
+          <p>{imageryTemporalLabel()}</p>
           {mosaic.status === 'ready' && (
             <p>
               {mosaic.manifest.attribution_display} — true-colour Sentinel-2 mosaic, locally
