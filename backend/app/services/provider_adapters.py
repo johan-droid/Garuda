@@ -36,16 +36,12 @@ from app.domain.contracts import (
     Observation,
     SourceSummary,
 )
+from app.services.circuit import CircuitBreaker, CircuitOpenError, breaker_for
 from app.services.http_client import UnsafeURLError, fetch_json, validate_url
 
 import json
 
 logger = get_logger("garuda.providers")
-
-
-
-
-
 
 
 class ProviderError(Exception):
@@ -122,6 +118,10 @@ class BaseProviderAdapter(ABC):
         self.max_retries = max_retries if max_retries is not None else settings.UPSTREAM_MAX_RETRIES
         self.backoff_base = backoff_base if backoff_base is not None else settings.UPSTREAM_BACKOFF_BASE_SECONDS
         self.raise_on_error = raise_on_error
+        # Shared per upstream, not per instance: routes build a new adapter on
+        # every request, and a breaker that died with its adapter would never
+        # accumulate enough failures to notice a persistently dead source.
+        self._breaker: CircuitBreaker = breaker_for(f"{type(self).__name__}:{base_url}")
 
     @abstractmethod
     @abstractmethod
@@ -144,9 +144,7 @@ class BaseProviderAdapter(ABC):
     def _build_url(self, place_id: str) -> str:
         """Construct the upstream endpoint URL for a place."""
         if not self.base_url:
-            raise ProviderConfigurationError(
-                f"Upstream base URL is not configured for {self.__class__.__name__}."
-            )
+            raise ProviderConfigurationError(f"Upstream base URL is not configured for {self.__class__.__name__}.")
         base = self.base_url.strip()
         if "{place_id}" in base:
             return base.format(place_id=place_id)
@@ -159,11 +157,38 @@ class BaseProviderAdapter(ABC):
     def _fetch_json(self, url: str) -> Any:
         """Fetch and parse upstream JSON document with retries and SSRF checks.
 
-        SSRF protection: UnsafeURLError is NEVER swallowed and will be raised immediately.
-        HTTP errors and timeouts are retried up to max_retries.
+        SSRF protection: UnsafeURLError is NEVER swallowed and will be raised
+        immediately. The address is validated *before* the breaker is
+        consulted, so refusing a call can never hide a bad URL.
+
+        The breaker is consulted once per request rather than per attempt:
+        retries are what smooths a blip, the breaker is what stops us paying a
+        dead upstream over and over.
         """
         validate_url(url)
 
+        try:
+            self._breaker.before_request()
+        except CircuitOpenError as exc:
+            # Re-raised as the typed error callers already expect, so the
+            # adapters' graceful-degradation paths treat a refused call like
+            # any other upstream failure instead of a new failure mode.
+            raise ProviderUnavailableError(str(exc)) from exc
+
+        try:
+            payload = self._request_with_retries(url)
+        except Exception:
+            # One failure per request, counted only after the retry budget is
+            # spent: a blip the retries absorbed must not open the breaker.
+            self._breaker.record_failure()
+            raise
+        self._breaker.record_success()
+        return payload
+
+    def _request_with_retries(self, url: str) -> Any:
+        """Run the retry/backoff loop for one upstream URL. Unchanged behaviour
+        from the original `_fetch_json`, merely named so the breaker can wrap it.
+        """
         headers = {
             "User-Agent": self.user_agent,
             "Accept": "application/json",
@@ -185,9 +210,7 @@ class BaseProviderAdapter(ABC):
                     time.sleep(min(backoff, settings.UPSTREAM_BACKOFF_MAX_SECONDS))
                     backoff *= 2
                 else:
-                    raise ProviderTimeoutError(
-                        f"Upstream timed out after {attempts} attempt(s): {url}"
-                    ) from exc
+                    raise ProviderTimeoutError(f"Upstream timed out after {attempts} attempt(s): {url}") from exc
             except httpx.NetworkError as exc:
                 last_error = exc
                 if attempt < attempts - 1 and self.backoff_base > 0:
@@ -195,15 +218,9 @@ class BaseProviderAdapter(ABC):
                     backoff *= 2
             except httpx.HTTPStatusError as exc:
                 if exc.response is not None and exc.response.status_code == 429:
-                    raise ProviderRateLimitedError(
-                        f"Upstream rate-limited the request: {url}"
-                    ) from exc
+                    raise ProviderRateLimitedError(f"Upstream rate-limited the request: {url}") from exc
                 last_error = exc
-                if (
-                    exc.response is not None
-                    and exc.response.status_code >= 500
-                    and attempt < attempts - 1
-                ):
+                if exc.response is not None and exc.response.status_code >= 500 and attempt < attempts - 1:
                     if self.backoff_base > 0:
                         time.sleep(min(backoff, settings.UPSTREAM_BACKOFF_MAX_SECONDS))
                         backoff *= 2
@@ -573,7 +590,11 @@ class EarthSearchSentinelAdapter(BaseProviderAdapter):
         max_scenes: int = 50,
         default_date_end: str = "2026-12-31T23:59:59Z",
     ) -> None:
-        resolved_stac = stac_endpoint or getattr(settings, "EARTH_SEARCH_STAC_ENDPOINT", None) or "https://earth-search.aws.element84.com/v1"
+        resolved_stac = (
+            stac_endpoint
+            or getattr(settings, "EARTH_SEARCH_STAC_ENDPOINT", None)
+            or "https://earth-search.aws.element84.com/v1"
+        )
         super().__init__(
             base_url=resolved_stac,
             client=client,
@@ -602,7 +623,8 @@ class EarthSearchSentinelAdapter(BaseProviderAdapter):
                 url=self.stac_endpoint,
                 licence=self.licence,
                 reference_period=None,
-                retrieved_at=datetime.now(UTC),                    verification_status=VerificationStatus.VERIFIED_WITH_LIMITS,
+                retrieved_at=datetime.now(UTC),
+                verification_status=VerificationStatus.VERIFIED_WITH_LIMITS,
             )
         ]
 
@@ -702,7 +724,8 @@ class EarthSearchSentinelAdapter(BaseProviderAdapter):
                 place_id="bbox",
                 source_id=self.source_id,
                 domain=DOMAIN_ENVIRONMENT,
-                licence=self.licence,                    quality_status=DataStatus.CURRENT,
+                licence=self.licence,
+                quality_status=DataStatus.CURRENT,
                 retrieved_at=now,
                 published_at=best["datetime"],
                 reference_period_start=best["datetime"].date(),
@@ -774,7 +797,11 @@ class EarthSearchSentinelAdapter(BaseProviderAdapter):
         self, place_id: str, error_reason: str = "", *, bbox: tuple[float, float, float, float] | None = None
     ) -> list[Observation]:
         now = datetime.now(UTC)
-        note = f"Sentinel STAC unavailable: {error_reason}" if error_reason else "Sentinel STAC imagery metadata unavailable."
+        note = (
+            f"Sentinel STAC unavailable: {error_reason}"
+            if error_reason
+            else "Sentinel STAC imagery metadata unavailable."
+        )
         return [
             Observation(
                 field_name="latest_sentinel2_scene",

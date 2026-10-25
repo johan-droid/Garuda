@@ -50,6 +50,21 @@ def _schema() -> Iterator[None]:
         pass
 
 
+@pytest.fixture(autouse=True)
+def _isolated_breakers() -> Iterator[None]:
+    """Breakers are process-wide (as the cache is), so reset them per test.
+
+    Several adapter tests deliberately drive an upstream into failure; without
+    this, one test's accumulated failures would open a breaker and change what
+    a later test observes.
+    """
+    from app.services.circuit import reset_breakers
+
+    reset_breakers()
+    yield
+    reset_breakers()
+
+
 @pytest.fixture()
 def client() -> Iterator[TestClient]:
     """Return a TestClient bound to the application."""
