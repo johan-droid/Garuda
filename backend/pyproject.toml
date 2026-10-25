@@ -27,6 +27,14 @@ dev = [
     "httpx>=0.27",
     "ruff>=0.6",
     "mypy>=1.11",
+    # Declared here rather than in `dependencies` because nothing in `app/`
+    # imports it: it is the migration tool the `alembic/` directory and
+    # `tests/test_migrations.py` run on. It was previously installed by hand
+    # into the dev venv, so a clean checkout had no alembic and
+    # `tests/test_migrations.py` failed to even collect - and the local
+    # `alembic/` directory then shadowed the real package as a namespace
+    # package, which is why the failure reads as "unknown location".
+    "alembic>=1.13",
 ]
 postgres = [
     "psycopg[binary]>=3.2",
