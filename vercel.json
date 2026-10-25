@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "name": "garuda-web",
+  "builds": [
+    { "src": "frontend/package.json", "use": "@vercel/static-build", "config": { "distDir": "frontend/dist" } }
+  ],
+  "routes": [
+    { "src": "/assets/(.*)", "headers": { "cache-control": "public, max-age=31536000, immutable" }, "dest": "/assets/$1" },
+    { "src": "/cesium/(.*)", "headers": { "cache-control": "public, max-age=31536000, immutable" }, "dest": "/cesium/$1" },
+    { "src": "/health(.*)", "dest": "${GARUDA_BACKEND_URL}/health$1" },
+    { "src": "/api/(.*)", "dest": "${GARUDA_BACKEND_URL}/api/$1" },
+    { "src": "/(.*)", "dest": "/frontend/dist/index.html" }
+  ],
+  "env": {
+    "GARUDA_BACKEND_URL": { "description": "Production backend URL (Railway/Render/fly.io, not Vercel serverless)" }
+  },
+  "framework": null,
+  "installCommand": "cd frontend && npm install --no-audit --no-fund",
+  "buildCommand": "cd frontend && npx tsc --noEmit && vite build"
+}
