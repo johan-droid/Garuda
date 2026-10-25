@@ -15,6 +15,8 @@ help:
 	@echo "  make build          - Build frontend production bundle"
 	@echo "  make test-imagery   - Run offline Sentinel-2 pipeline tests"
 	@echo "  make imagery-build  - Build the region mosaic (REGION=odisha-test)"
+	@echo "  make docker-up       - Build the backend image and start the container stack"
+	@echo "  make docker-down     - Stop the container stack (keeps the data volume)"
 	@echo "  make clean          - Remove cache and build artifacts"
 
 init-db:
@@ -92,6 +94,21 @@ imagery-validate:
 imagery-clean:
 	rm -rf "frontend/public/imagery/$(REGION)"
 	@echo "Removed generated imagery tiles only; source data and cache were not touched."
+
+# Container stack. `docker build` runs first because this host's buildx (v0.14)
+# is older than the version `docker compose build` requires (0.17); the image is
+# named in docker-compose.yml, so compose runs it instead of rebuilding.
+docker-build:
+	docker build -t garuda-api:latest .
+
+docker-up: docker-build
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f backend
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +

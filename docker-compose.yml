@@ -1,0 +1,59 @@
+# Garuda: backend API plus the built frontend.
+#
+#   docker compose up --build
+#
+# then open http://localhost:8000 for the API (which also serves the frontend
+# build from /app/frontend/dist).
+#
+# The database is a named volume so it survives `docker compose down`. Data is
+# initialised and seeded by the image's entrypoint on first start; because both
+# steps are idempotent it is safe to restart.
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Named so a locally pre-built image is reused. Needed because this host's
+    # buildx (v0.14) is older than the version `docker compose build` requires
+    # (0.17); `make docker-up` builds with `docker build` first, which works, and
+    # compose then runs the image instead of rebuilding it. On a host with a
+    # newer buildx, `docker compose up --build` works as written.
+    image: garuda-api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      # `development` is the default and deliberately requires no secrets. Set
+      # these for anything deployed.
+      ENVIRONMENT: ${GARUDA_ENV:-development}
+      SECRET_KEY: ${GARUDA_SECRET_KEY:-}
+      ADMIN_API_KEY: ${GARUDA_ADMIN_API_KEY:-}
+      SEED_ON_START: ${GARUDA_SEED_ON_START:-true}
+    volumes:
+      - garuda-data:/data
+    healthcheck:
+      # `/health` reports the cache and upstream diagnostics; a 200 here means
+      # the app is serving, which is all a compose dependency needs.
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # The frontend is a static bundle, so it is served by nginx rather than by a
+  # node container at runtime. It proxies /api/ to the backend, which is what the
+  # app expects in deployment (the dev server does the same with Vite's proxy).
+  frontend:
+    image: nginx:1.27-alpine
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+
+volumes:
+  garuda-data:

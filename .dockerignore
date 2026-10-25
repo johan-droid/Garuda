@@ -1,0 +1,24 @@
+# Keep the build context small and free of anything that would shadow a
+# real path. Notably `.venv/`: without this line the build would copy a full
+# virtualenv into the image, and its absolute interpreter paths would break the
+# `pip install` that follows.
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+node_modules
+frontend/node_modules
+frontend/dist
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.playwright-mcp
+playwright-report
+test-results
