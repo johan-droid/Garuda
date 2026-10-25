@@ -99,16 +99,16 @@ def test_task_08_pagination_total_count_without_stale(db: Session, client: TestC
 
 
 def test_task_09_list_routes(capsys: pytest.CaptureFixture[str]) -> None:
-    """BE-TASK-09: Ensure list_routes outputs all 24 registered API endpoints."""
+    """BE-TASK-09: Ensure list_routes outputs all 25 registered API endpoints."""
     routes = get_routes()
-    assert len(routes) == 24
+    assert len(routes) == 25
 
     paths = [path for _, path in routes]
 
-    # Places routes (10: search/profile/boundaries/reverse, environment-scenes,
-    # live IMD weather, live NHM health-facilities)
+    # Places routes (11: search/profile/boundaries/reverse, environment-scenes,
+    # live IMD weather, live NHM health-facilities, live NDMA disasters)
     places_routes = [p for p in paths if p.startswith("/api/v1/places")]
-    assert len(places_routes) == 10
+    assert len(places_routes) == 11
 
     # Observations routes (3)
     obs_routes = [p for p in paths if p.startswith("/api/v1/observations")]
@@ -134,7 +134,7 @@ def test_task_09_list_routes(capsys: pytest.CaptureFixture[str]) -> None:
     list_routes_main()
     captured = capsys.readouterr()
     output_lines = [line.strip() for line in captured.out.strip().splitlines() if line.strip()]
-    assert len(output_lines) == 24
+    assert len(output_lines) == 25
 
     # Test running as module: python3 -m tools.list_routes
     backend_dir = Path(__file__).resolve().parents[1]
@@ -146,4 +146,4 @@ def test_task_09_list_routes(capsys: pytest.CaptureFixture[str]) -> None:
         check=True,
     )
     module_lines = [line.strip() for line in proc.stdout.strip().splitlines() if line.strip()]
-    assert len(module_lines) == 24
+    assert len(module_lines) == 25

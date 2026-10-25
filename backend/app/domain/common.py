@@ -12,6 +12,10 @@ class DataStatus(str, Enum):
 
     `UNAVAILABLE` is distinct from a zero value. The system must never
     represent "we do not know" as `0`.
+
+    `FORECAST` is a state of its own rather than a flavour of `current`: a
+    forecast is a projection, so however recently it was issued it is not a
+    measurement of the present.
     """
 
     CURRENT = "current"
@@ -21,6 +25,19 @@ class DataStatus(str, Enum):
     CONFLICTING = "conflicting"
     APPROXIMATE = "approximate"
     UNVERIFIED = "unverified"
+    FORECAST = "forecast"
+
+
+class RecordType(str, Enum):
+    """What kind of statement a record makes.
+
+    This is not a domain and not a unit: it decides which freshness rule
+    applies. The same field name can appear as all three over time.
+    """
+
+    OBSERVATION = "observation"
+    FORECAST = "forecast"
+    ALERT = "alert"
 
 
 class PlaceType(str, Enum):

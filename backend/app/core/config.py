@@ -167,6 +167,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("NHM_API_BASE_URL", "GARUDA_NHM_API_BASE_URL"),
         description="Base URL for NHM health upstream API. Live calls disabled when unset.",
     )
+    NDMA_API_BASE_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("NDMA_API_BASE_URL", "GARUDA_NDMA_API_BASE_URL"),
+        description="Base URL for NDMA disaster bulletin upstream API. Live calls disabled when unset.",
+    )
 
     # Logging
     LOG_LEVEL: str = Field(default="INFO", description="Minimum log level")

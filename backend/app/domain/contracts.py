@@ -12,6 +12,7 @@ from app.domain.common import (
     GeographyLevel,
     HealthCategory,
     PlaceType,
+    RecordType,
     VerificationStatus,
 )
 
@@ -101,6 +102,10 @@ class Observation(BaseModel):
             "dated source from an undated fixture."
         ),
     )
+    # What kind of statement this is. It decides which freshness rule applies:
+    # a forecast is never a current fact, an alert expires, an observation is
+    # judged on its own date. See `app.services.freshness.determine_status`.
+    record_type: RecordType = RecordType.OBSERVATION
     # Optional extended metadata for later extended observation types.
     satellite_mission: str | None = Field(default=None, max_length=255)
     resolution_meters: float | None = Field(default=None, description="Nominal spatial resolution of the observation in metres.")
@@ -176,6 +181,36 @@ class HealthObservationView(Observation):
             end = end.replace(tzinfo=UTC)
         self.expired = end < reference
         return self.expired
+
+
+class DisasterObservation(Observation):
+    """A hazard record: an alert, a forecast, or an observed event.
+
+    The validity window is what makes an alert different from a measurement.
+    `valid_until` is not a freshness threshold - it is the authority's own
+    statement of when the advisory stops applying - so past it the record is
+    expired and must be reported `unavailable` rather than as a lapsed advisory
+    still in force.
+    """
+
+    record_type: RecordType = RecordType.ALERT
+    issuing_authority: str | None = Field(default=None, max_length=255)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    affected_geography_level: GeographyLevel | None = None
+    severity: str | None = Field(default=None, max_length=64)
+
+    def is_expired(self, now: datetime | None = None) -> bool:
+        """True when the record's validity window has passed."""
+        if self.valid_until is None:
+            return False
+        reference = now or utcnow()
+        end = self.valid_until
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=UTC)
+        if reference.tzinfo is None:
+            reference = reference.replace(tzinfo=UTC)
+        return end < reference
 
 
 class PanelResponse(BaseModel):

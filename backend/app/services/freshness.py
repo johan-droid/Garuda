@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
-from app.domain.common import DataStatus
+from app.domain.common import DataStatus, RecordType
 from app.domain.contracts import DataStatusSummary, Observation, SourceSummary
 
 # Maximum age (days) applied to each domain.
@@ -31,6 +31,7 @@ _NON_CURRENT = {
     DataStatus.CONFLICTING,
     DataStatus.UNVERIFIED,
     DataStatus.HISTORICAL,
+    DataStatus.FORECAST,
 }
 
 
@@ -98,10 +99,29 @@ def determine_status(observation: Observation, now: datetime | None = None) -> D
     A stored status is authoritative when it marks the datum as unusable
     (`unavailable`, `conflicting`, `unverified`). Otherwise the status is
     derived from the age of the data relative to the domain threshold.
+
+    Before any of that, the *kind of statement* is applied, because the same
+    freshness arithmetic gives the wrong answer for two of the three kinds:
+
+      * A **forecast** is a projection. Its issue time says when it was made,
+        not what period it measures, so it is never a current fact - it is
+        reported `forecast` and left to the reader as a projection.
+      * An **alert** carries the authority's own validity window. Past
+        `valid_until` the advisory has lapsed, which is `unavailable` - an
+        expired warning is not a warning still in force.
     """
     stored = observation.quality_status
     if stored in _NON_CURRENT:
         return stored
+
+    record_type = getattr(observation, "record_type", RecordType.OBSERVATION)
+    if record_type == RecordType.FORECAST:
+        return DataStatus.FORECAST
+
+    if record_type == RecordType.ALERT:
+        valid_until = _as_utc(getattr(observation, "valid_until", None))
+        if valid_until is not None and valid_until < (now or datetime.now(UTC)):
+            return DataStatus.UNAVAILABLE
 
     # Freshness of an undated value is unknowable. Falling back to
     # `retrieved_at` would make every freshly ingested figure look current, so
@@ -196,6 +216,12 @@ def summarize_domain(
     elif DataStatus.APPROXIMATE in statuses:
         status = DataStatus.APPROXIMATE
         message = "These figures are approximate."
+    elif DataStatus.FORECAST in statuses:
+        # A projection is never the present tense. This rung sits below every
+        # other verdict but above `current`, so a panel holding a forecast is
+        # never badged as describing now.
+        status = DataStatus.FORECAST
+        message = "These are forecasts: projections, not measurements of the present."
     else:
         status = DataStatus.CURRENT
         message = None
