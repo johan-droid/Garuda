@@ -3,11 +3,17 @@ import * as Cesium from 'cesium';
 import {
   GIBS_BASE_URL,
   IMAGERY_LAYERS,
+  temporalLabel,
+  wmtsTimeDimension,
   type ImageryLayerConfig,
   type LocalMosaicManifest,
 } from './config';
 
 function createGibsProvider(config: ImageryLayerConfig): Cesium.ImageryProvider {
+  // A static layer sends no `time` dimension at all. Sending an empty one would
+  // be a request GIBS cannot serve, and omitting it is what makes "no date"
+  // an explicit choice rather than a default.
+  const time = wmtsTimeDimension(config);
   return new Cesium.WebMapTileServiceImageryProvider({
     url: GIBS_BASE_URL,
     layer: config.layer,
@@ -20,9 +26,23 @@ function createGibsProvider(config: ImageryLayerConfig): Cesium.ImageryProvider 
     tileWidth: config.tileSize,
     tileHeight: config.tileSize,
     maximumLevel: config.maximumLevel,
+    ...(time ? { time } : {}),
     enablePickFeatures: false,
     credit: config.attribution,
   });
+}
+
+/**
+ * What the UI may tell a reader about when the visible imagery was captured.
+ *
+ * Returns the label for the topmost layer that has an opinion, so the globe
+ * states a real date when the imagery has one and says "static composite"
+ * rather than showing nothing or inventing a date.
+ */
+export function imageryTemporalLabel(): string {
+  const withOpinion = [...IMAGERY_LAYERS].reverse().find((l) => l.temporal_coverage.kind === 'dated');
+  const layer = withOpinion ?? IMAGERY_LAYERS[0];
+  return temporalLabel(layer);
 }
 
 /**

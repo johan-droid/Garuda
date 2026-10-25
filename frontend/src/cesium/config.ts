@@ -64,6 +64,18 @@ export const GIBS_ACKNOWLEDGEMENT =
   "We acknowledge the use of imagery provided by services from NASA's Global Imagery Browse " +
   "Services (GIBS), part of NASA's Earth Science Data and Information System (ESDIS).";
 
+/**
+ * What a layer can honestly say about when it was captured.
+ *
+ * `dated` is a real acquisition date from the provider. `static` means the
+ * layer is a composite with no single acquisition date - Blue Marble and the
+ * GIBS reference overlays are built from many scenes, so inventing a date for
+ * them would misreport the imagery.
+ */
+export type TemporalCoverage =
+  | { kind: 'dated'; date: string }
+  | { kind: 'static' };
+
 export interface ImageryLayerConfig {
   id: string;
   label: string;
@@ -77,6 +89,24 @@ export interface ImageryLayerConfig {
   maximumLevel: number;
   tileSize: number;
   attribution: string;
+  /**
+   * When the imagery was captured. Required: a layer must take a position,
+   * because the alternative - leaving it unset - is what previously let the UI
+   * imply a date the imagery never had.
+   */
+  temporal_coverage: TemporalCoverage;
+}
+
+/** The WMTS `time` dimension value, or null when the layer has no date. */
+export function wmtsTimeDimension(config: ImageryLayerConfig): string | null {
+  return config.temporal_coverage.kind === 'dated' ? config.temporal_coverage.date : null;
+}
+
+/** What the UI may tell a reader about when this imagery was captured. */
+export function temporalLabel(config: ImageryLayerConfig): string {
+  return config.temporal_coverage.kind === 'dated'
+    ? `Captured ${config.temporal_coverage.date}`
+    : 'Static composite (no single acquisition date)';
 }
 
 /**
@@ -84,7 +114,12 @@ export interface ImageryLayerConfig {
  * on a standard 1x1 power-of-two pyramid, which matches Cesium's
  * WebMercatorTilingScheme. The EPSG:4326 sets are deliberately not used: their
  * levels are 2x1, 3x2, 5x3, ... and do not align with any Cesium tiling scheme.
- * All layers here are time-static, so no date dimension is sent.
+ *
+ * Every layer here declares its `temporal_coverage`. These three are all
+ * composites with no single acquisition date - Blue Marble is assembled from
+ * many passes and the reference layers are cartography - so they are `static`
+ * and no WMTS `time` dimension is sent. A future daily layer (e.g. MODIS
+ * true-colour) is where `dated` applies.
  */
 export const IMAGERY_LAYERS: ImageryLayerConfig[] = [
   {
@@ -98,6 +133,7 @@ export const IMAGERY_LAYERS: ImageryLayerConfig[] = [
     maximumLevel: 8,
     tileSize: 256,
     attribution: 'Imagery: NASA Blue Marble / GIBS (NASA EOSDIS).',
+    temporal_coverage: { kind: 'static' },
   },
   {
     id: 'gibs-reference-features',
@@ -110,6 +146,7 @@ export const IMAGERY_LAYERS: ImageryLayerConfig[] = [
     maximumLevel: 13,
     tileSize: 256,
     attribution: 'Cartography overlay: NASA GIBS Reference Features.',
+    temporal_coverage: { kind: 'static' },
   },
   {
     id: 'gibs-reference-labels',
@@ -122,6 +159,7 @@ export const IMAGERY_LAYERS: ImageryLayerConfig[] = [
     maximumLevel: 13,
     tileSize: 256,
     attribution: 'Cartography overlay: NASA GIBS Reference Labels.',
+    temporal_coverage: { kind: 'static' },
   },
 ];
 

@@ -298,6 +298,50 @@ class LatestObservationResponse(BaseModel):
 
 
 
+class SceneMetadata(BaseModel):
+    """The scene a derived indicator came from.
+
+    Every indicator carries this, because a ratio with no scene behind it is
+    not a fact about the place - it is a number. The acquisition date is what
+    lets a reader see how old the reading is, and the cloud cover is what lets
+    them judge it, since a scene-level fraction is not a per-pixel guarantee.
+    """
+
+    scene_id: str
+    acquisition_date: datetime | None = None
+    resolution_meters: float | None = None
+    cloud_cover_percentage: float | None = None
+    satellite_mission: str | None = None
+    source_url: str | None = None
+
+
+class EnvironmentIndicator(BaseModel):
+    """One derived indicator, with the scene it came from."""
+
+    field_name: str
+    label: str
+    status: DataStatus
+    value: float | None = None
+    unit: str | None = None
+    bands: list[str] = Field(default_factory=list)
+    formula: str | None = None
+    unavailable_reason: str | None = None
+    scene: SceneMetadata | None = None
+
+
+class EnvironmentIndicatorsResponse(BaseModel):
+    """Derived satellite indicators for a place, with the scene behind them."""
+
+    place: Place
+    status: GetLatestObservationStatus
+    scene: SceneMetadata | None = None
+    indicators: list[EnvironmentIndicator] = Field(default_factory=list)
+    unavailable_reason: str | None = None
+    retrieved_at: datetime = Field(default_factory=utcnow)
+    coverage_note: str | None = None
+    data_gaps: list[str] = Field(default_factory=list)
+
+
 class ApiError(BaseModel):
     """Uniform error envelope returned by the API."""
 

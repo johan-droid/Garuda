@@ -7,9 +7,8 @@ table is there, so the omission is caught here rather than as a runtime
 `no such table: saved_places`.
 """
 
-from sqlalchemy import inspect
 
-from app.db.session import Base, engine
+from app.db.session import Base
 
 
 def test_saved_places_is_registered_on_the_metadata() -> None:

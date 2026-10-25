@@ -45,7 +45,6 @@ def test_alembic_migration_upgrade_and_downgrade(tmp_path: Path) -> None:
 
     from app.db.session import Base
 
-    import app.models.saved_place  # noqa: F401  (registers the table)
 
     migrated = set(inspect(create_engine(f"sqlite:///{test_db}")).get_table_names())
     declared = set(Base.metadata.tables)

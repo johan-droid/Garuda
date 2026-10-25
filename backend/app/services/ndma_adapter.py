@@ -41,8 +41,6 @@ from app.services.provider_adapters import (
     ProviderUnavailableError,
     UnsafeURLError,
     _parse_datetime,
-    fetch_json,
-    validate_url,
 )
 
 logger = get_logger("garuda.providers")
