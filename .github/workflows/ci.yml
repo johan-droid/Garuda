@@ -1,0 +1,70 @@
+name: CI
+
+# The four baseline commands from the README's "Quality Gates", run on a clean
+# checkout. The README previously claimed these passed with no workflow to run
+# them, so this is the gate that makes that claim true.
+#
+# The backend job creates its venv at the repo root so the commands match what a
+# developer runs (`PYTHONPATH=backend .venv/bin/pytest`), and so the frontend
+# build and backend tests resolve the same dependency set.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m venv ../.venv
+          ../.venv/bin/pip install --upgrade pip
+          ../.venv/bin/pip install -e '.[dev]'
+
+      - name: Run the backend test suite
+        run: ../.venv/bin/python -m pytest . -q
+
+      - name: Type-check the backend
+        run: ../.venv/bin/mypy app
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Run the frontend test suite
+        run: npx vitest run
+
+      - name: Build the production bundle
+        run: npm run build

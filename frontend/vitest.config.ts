@@ -9,5 +9,10 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     restoreMocks: true,
+    // `?raw` on a stylesheet otherwise resolves to an empty string: Vite's CSS
+    // pipeline claims the import before the raw loader sees it. Enabling CSS
+    // processing lets `index.css?raw` carry the real source, which
+    // `contrast.test.ts` and `a11y.test.tsx` read to audit the palette.
+    css: true,
   },
 });

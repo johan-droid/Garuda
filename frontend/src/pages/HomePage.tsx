@@ -409,6 +409,9 @@ export const HomePage: React.FC = () => {
               type="text"
               className="search-input"
               placeholder="Search place, district, block, or alias..."
+              // A placeholder is not a label: it disappears on the first
+              // keystroke, and a screen reader then announces a bare edit box.
+              aria-label="Search place, district, block, or alias"
               value={query}
               onChange={(e) => handleSearch(e.target.value)}
             />
@@ -1117,10 +1120,16 @@ export const HomePage: React.FC = () => {
       {/* Provenance Evidence Modal */}
       {showProvenanceModal && (
         <div className="modal-backdrop" onClick={() => setShowProvenanceModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="provenance-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <div>
-                <h2>Evidence & Data Provenance</h2>
+                <h2 id="provenance-dialog-title">Evidence & Data Provenance</h2>
                 <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
                   Auditable public data sources registered for {selectedPlace.canonical_name}
                 </div>
@@ -1129,6 +1138,7 @@ export const HomePage: React.FC = () => {
                 type="button"
                 className="modal-close-btn"
                 onClick={() => setShowProvenanceModal(false)}
+                aria-label="Close evidence panel"
               >
                 ✕
               </button>
@@ -1203,10 +1213,16 @@ export const HomePage: React.FC = () => {
       {/* Diagnostics Modal */}
       {showDiagnosticsModal && (
         <div className="modal-backdrop" onClick={() => setShowDiagnosticsModal(false)}>
-          <div className="modal-content modal-lg" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-content modal-lg"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="diagnostics-dialog-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <div>
-                <h2>Registered Data Sources Diagnostics</h2>
+                <h2 id="diagnostics-dialog-title">Registered Data Sources Diagnostics</h2>
                 <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
                   Real-time connectivity, latency, and ingestion status of registered adapters
                 </div>
@@ -1215,6 +1231,7 @@ export const HomePage: React.FC = () => {
                 type="button"
                 className="modal-close-btn"
                 onClick={() => setShowDiagnosticsModal(false)}
+                aria-label="Close diagnostics panel"
               >
                 ✕
               </button>

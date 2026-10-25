@@ -953,3 +953,19 @@ body {
   font-size: 0.78rem;
   line-height: 1.45;
 }
+
+/* Reduced motion. The pulse on the live-data dot and the modal entrance are
+   the only non-instantaneous motion here; a reader who has asked their system
+   to minimise motion gets neither. `transition-duration` is zeroed rather than
+   transitions removed, so hover and focus feedback still change state
+   immediately instead of animating. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}
