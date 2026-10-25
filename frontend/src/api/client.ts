@@ -1294,7 +1294,7 @@ export async function searchPlaces(query: string): Promise<SearchResponse> {
     // Backend offline / network failure -> fallback to local search
   }
 
-  // Fallback search over pilot dataset
+  // Fallback search over pilot dataset (limited to verified locations)
   const q = query.trim().toLowerCase();
   const matched = PILOT_PLACES.filter(
     (p) =>
@@ -1314,7 +1314,10 @@ export async function searchPlaces(query: string): Promise<SearchResponse> {
     limit: 20,
     offset: 0,
     degraded: true,
-    notes: ['Serving verified pilot dataset from local cache'],
+    notes: [
+      'Serving verified pilot dataset from local cache',
+      'For full global search, ensure backend is running',
+    ],
   };
 }
 

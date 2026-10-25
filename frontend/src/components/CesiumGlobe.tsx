@@ -10,7 +10,7 @@ import {
   type LocalMosaicManifest,
 } from '../cesium/config';
 import { createTerrain } from '../cesium/terrain';
-import { addImageryLayers, addMosaicLayer } from '../cesium/imagery';
+import { addImageryLayers, addMosaicLayer, addRainViewerLayer } from '../cesium/imagery';
 
 interface CesiumGlobeProps {
   boundaries: GeoJsonFeatureCollection<LiveBoundaryProperties> | null;
@@ -270,6 +270,46 @@ export function CesiumGlobe({
         boundaryEntitiesRef.current.set(props.id, created);
       }
     }
+  }, [boundaries, ready]);
+
+  // Add RainViewer radar layer for the given location.
+  // Uses the center of the first boundary if available, otherwise defaults to India.
+  // Weather animation cycle: refresh radar every 5 minutes.
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !ready) return;
+
+    let lng: number = CAMERAS.india.longitude;
+    let lat: number = CAMERAS.india.latitude;
+    if (boundaries && boundaries.features.length > 0) {
+    const first = boundaries.features[0];
+    const ring = first.geometry.type === 'Polygon'
+      ? first.geometry.coordinates[0]
+      : first.geometry.type === 'MultiPolygon'
+        ? (first.geometry.coordinates[0] as number[][][])[0][0]
+        : null;
+    if (ring && ring.length > 0) {
+      const center = ring[Math.floor(ring.length / 2)];
+      lng = center[0];
+      lat = center[1];
+    }
+  }
+
+    const rainLayer = addRainViewerLayer(viewer, lng, lat);
+
+    // Weather animation cycle: refresh radar every 5 minutes
+    const refreshInterval = setInterval(() => {
+      if (!viewer.isDestroyed()) {
+        // Refresh the rain layer by recreating it
+        viewer.imageryLayers.remove(rainLayer, true);
+        addRainViewerLayer(viewer, lng, lat);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => {
+      viewer.imageryLayers.remove(rainLayer, true);
+      clearInterval(refreshInterval);
+    };
   }, [boundaries, ready]);
 
   useEffect(() => {

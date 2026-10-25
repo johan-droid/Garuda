@@ -63,6 +63,7 @@ function PanelBadge({ panel }: { panel?: PanelResponse }) {
 export const HomePage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchNotes, setSearchNotes] = useState<string[]>([]);
   // Default to Khordha district (designated pilot region)
   const [selectedPlace, setSelectedPlace] = useState<Place>(PILOT_PLACES[1]);
   const [profile, setProfile] = useState<PlaceProfile | null>(null);
@@ -154,13 +155,16 @@ export const HomePage: React.FC = () => {
     setQuery(val);
     if (!val.trim()) {
       setSearchResults([]);
+      setSearchNotes([]);
       return;
     }
     try {
       const res = await searchPlaces(val);
       setSearchResults(res.results);
+      setSearchNotes(res.notes);
     } catch {
       setSearchResults([]);
+      setSearchNotes([]);
     }
   };
 
@@ -441,6 +445,15 @@ export const HomePage: React.FC = () => {
           {searchResults.length > 0 ? (
             <div>
               <div className="card-title">Search Results ({searchResults.length})</div>
+              {searchNotes.length > 0 && (
+                <div className="search-notes">
+                  {searchNotes.map((note, i) => (
+                    <div key={i} className="note-item">
+                      {note}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="search-results-list">
                 {searchResults.map((item) => (
                   <div
