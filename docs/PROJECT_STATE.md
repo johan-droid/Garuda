@@ -7,7 +7,7 @@
 
 | Field | Value |
 |:---|:---|
-| **Last updated** | 2026-10-24 |
+| **Last updated** | 2026-10-26 |
 | **Describes** | The tree after end-to-end audit, gap closure, and regression verification |
 | **HEAD** | `bcf0602 feat: add environment scenes endpoint for latest Sentinel-2 observation metadata` |
 | **Pilot region** | Khordha District, Odisha, India (`IN-OD-29`) |
@@ -36,7 +36,7 @@ Backend serves the contract; frontend renders it; the seed database holds the pi
 | **Routes** | 20 endpoints across 6 routers (`places`, `environment_scenes`, `observations`, `sources`, `admin`, `health`) |
 | **Pilot data** | 10 places, 19 aliases, 7 sources, 103 observations across 8 domains |
 | **Tests** | 109 backend (`pytest`, incl. 2 alembic migration tests, 6 environment-scenes tests), 12 frontend (`vitest`), 20 imagery (+4 skipped network tests); `mypy backend/app` clean (39 files) |
-| **Static checks** | `mypy backend/app` clean (39 files), `tsc --noEmit` clean, `vite build` succeeds |
+| **Static checks** | `mypy backend/app` clean (39 files), `tsc --noEmit` clean (0 errors), `vite build` succeeds |
 | **CI** | None yet — `.github/` is empty; all checks below are run locally |
 
 ---

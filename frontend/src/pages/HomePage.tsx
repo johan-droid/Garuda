@@ -161,7 +161,7 @@ export const HomePage: React.FC = () => {
     try {
       const res = await searchPlaces(val);
       setSearchResults(res.results);
-      setSearchNotes(res.notes);
+      setSearchNotes(res.notes ?? []);
     } catch {
       setSearchResults([]);
       setSearchNotes([]);

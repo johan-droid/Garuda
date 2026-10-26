@@ -3,19 +3,60 @@
   "version": 2,
   "name": "garuda-web",
   "builds": [
-    { "src": "frontend/package.json", "use": "@vercel/static-build", "config": { "distDir": "frontend/dist" } }
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "frontend/dist" }
+    },
+    {
+      "src": "vercel/functions/handler.py",
+      "use": "@vercel/python",
+      "config": { "maxDuration": 30 }
+    }
   ],
   "routes": [
-    { "src": "/assets/(.*)", "headers": { "cache-control": "public, max-age=31536000, immutable" }, "dest": "/assets/$1" },
-    { "src": "/cesium/(.*)", "headers": { "cache-control": "public, max-age=31536000, immutable" }, "dest": "/cesium/$1" },
-    { "src": "/health(.*)", "dest": "${GARUDA_BACKEND_URL}/health$1" },
-    { "src": "/api/(.*)", "dest": "${GARUDA_BACKEND_URL}/api/$1" },
-    { "src": "/(.*)", "dest": "/frontend/dist/index.html" }
+    {
+      "src": "/assets/(.*)",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/cesium/(.*)",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "dest": "/cesium/$1"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/vercel/functions/handler.py"
+    },
+    {
+      "src": "/health(.*)",
+      "dest": "/vercel/functions/handler.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/dist/index.html"
+    }
   ],
   "env": {
-    "GARUDA_BACKEND_URL": { "description": "Production backend URL (Railway/Render/fly.io, not Vercel serverless)" }
+    "ENVIRONMENT": {
+      "description": "Application environment (development/production)",
+      "default": "development"
+    },
+    "SECRET_KEY": {
+      "description": "Secret key for FastAPI/signing",
+      "default": "garuda-dev-secret-key-change-in-production"
+    },
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection string (required for production)",
+      "optional": true
+    },
+    "GARUDA_BACKEND_URL": {
+      "description": "Deprecated - Garuda backend now runs on Vercel serverless",
+      "sensitive": true
+    }
   },
-  "framework": null,
   "installCommand": "cd frontend && npm install --no-audit --no-fund",
-  "buildCommand": "cd frontend && npx tsc --noEmit && vite build"
+  "buildCommand": "cd frontend && npx tsc --noEmit && vite build",
+  "framework": "python"
 }

@@ -381,3 +381,19 @@ class ReverseGeocodeResponse(BaseModel):
         description="Plain-language statement of what the match does and does not mean",
     )
 
+
+class ReverseGeocodeResult(ReverseGeocodeResponse):
+    """Extended reverse geocode result with additional data layers.
+
+    Includes weather observations and Wikipedia location intelligence
+    fetched via keyless public APIs (Nominatim, Open-Meteo, Wikipedia).
+    """
+
+    weather_observations: list[Observation] = Field(
+        default_factory=list,
+        description="Point weather and air quality observations from Open-Meteo",
+    )
+    wiki_title: str = Field(default="", description="Wikipedia article title for the location")
+    wiki_extract: str = Field(default="", description="Wikipedia extract summary")
+    wiki_thumbnail: str = Field(default="", description="Wikipedia thumbnail URL for the location")
+

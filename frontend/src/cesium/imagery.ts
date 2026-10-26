@@ -100,6 +100,33 @@ export function parseMosaicManifest(json: unknown): LocalMosaicManifest | null {
   return null;
 }
 
+/** Adds a RainViewer radar layer for the given coordinates. */
+export function addRainViewerLayer(
+  viewer: Cesium.Viewer,
+  lng: number,
+  lat: number,
+): Cesium.ImageryLayer {
+  const now = Date.now();
+  const iso3 = 'IN'; // India (default CAMERAS.india region)
+  // Use the provided coordinates to position the radar layer center;
+  // RainViewer global tiles are indexed by location, so we embed the
+  // center point as a query parameter so the server returns the correct tile.
+  const url = `https://tiles.rainviewer.com/v2/radar/${iso3}/Reflectivity/${now}/?lon=${lng}&lat=${lat}`;
+  const rainProvider = new Cesium.WebMapTileServiceImageryProvider({
+    url,
+    layer: 'Raster',
+    style: 'default',
+    format: 'image/png',
+    tileMatrixSetID: 'GoogleMapsCompatible_LevelN',
+    tileWidth: 256,
+    tileHeight: 256,
+    maximumLevel: 13,
+    minimumLevel: 0,
+    credit: 'Weather radar: RainViewer',
+  });
+  return viewer.imageryLayers.addImageryProvider(rainProvider);
+}
+
 /** Adds base layers first, then cartographic overlays, in configured order. */
 export function addImageryLayers(viewer: Cesium.Viewer): Cesium.ImageryLayer[] {
   const ordered = [...IMAGERY_LAYERS].sort((a, b) => {

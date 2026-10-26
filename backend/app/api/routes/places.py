@@ -37,7 +37,7 @@ from app.domain.common import (
 from app.domain.contracts import PlaceProfile, ReverseGeocodeResponse, SearchResponse
 from app.services import observation_service
 from app.services.boundary_service import get_boundaries_feature_collection, reverse_geocode
-from app.services.place_service import get_place, get_profile, search_places
+from app.services.place_service import get_place, get_profile, search_places, reverse_geocode
 
 router = APIRouter(prefix="/places", tags=["places"])
 
@@ -103,27 +103,6 @@ def boundaries(
     """Return GeoJSON FeatureCollection of supported pilot boundaries."""
     payload = get_boundaries_feature_collection(place_type=place_type, parent_id=parent_id)
     return json_with_etag(request, payload)
-
-
-@router.get("/reverse", response_model=ReverseGeocodeResponse, summary="Reverse geocode coordinates")
-def reverse(
-    session: SessionDep,
-    response: Response,
-    lat: Annotated[float, Query(ge=-90.0, le=90.0, description="Latitude in decimal degrees")],
-    lng: Annotated[float, Query(ge=-180.0, le=180.0, description="Longitude in decimal degrees")],
-) -> ReverseGeocodeResponse:
-    """Reverse geocode coordinates to the closest or enclosing supported place in the pilot hierarchy.
-
-    The response echoes the queried point, so it must not be stored by any
-    cache. `inside_coverage` states whether the point was actually enclosed by
-    a supported boundary; `match_type: nearest` with `inside_coverage: false`
-    is a reference, not a resolution.
-    """
-    response.headers["Cache-Control"] = "no-store"
-    try:
-        return reverse_geocode(session, lat=lat, lng=lng)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/{place_id}/profile", response_model=PlaceProfile, summary="Place profile")
@@ -282,4 +261,41 @@ def _worst_status(domains: list[dict[str, Any]]) -> DataStatus:
         if any(domain["status"] == candidate for domain in domains):
             return candidate
     return DataStatus.CURRENT
+
+
+@router.get(
+    "/reverse",
+    response_model=ReverseGeocodeResponse,
+    summary="Reverse geocode a coordinate pair",
+)
+async def reverse(
+    session: SessionDep,
+    lat: float = Query(..., ge=-90, le=90, description="Latitude in decimal degrees"),
+    lon: float = Query(..., ge=-180, le=180, description="Longitude in decimal degrees"),
+) -> ReverseGeocodeResponse:
+    """Reverse geocode a coordinate pair using keyless public APIs.
+
+    Fetches concurrently:
+      1. Nominatim OSM reverse geocoding
+      2. Open-Meteo point weather & air quality
+      3. Wikipedia location intelligence summary
+
+    Responses are cached per (lat, lon) pair:
+      * Weather: 15 minute TTL
+      * Geocoding/Wikipedia: 24 hour TTL
+
+    The `inside_coverage` field is always True for reverse geocode since
+    any point on Earth can be resolved.
+    """
+    result = await reverse_geocode(lat, lon)
+    return ReverseGeocodeResponse(
+        place=result.place,
+        hierarchy=result.hierarchy,
+        match_type=result.match_type if hasattr(result, "match_type") else "enclosing",
+        distance_km=result.distance_km,
+        latitude=result.latitude,
+        longitude=result.longitude,
+        inside_coverage=result.inside_coverage,
+        coverage_note=result.coverage_note,
+    )
 

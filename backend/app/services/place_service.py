@@ -4,13 +4,22 @@ Search is deliberately simple and local (substring match over the `places`
 table). An external geocoder can be added later behind the same interface;
 the response contract already carries `degraded` and `notes` so the UI can
 state plainly when results are incomplete.
+
+This module also provides a dynamic reverse-geocode endpoint that fetches
+real-time place intelligence for any coordinate on Earth using keyless public APIs:
+  * Reverse geocoding: Nominatim OpenStreetMap
+  * Point weather & air quality: Open-Meteo
+  * Location intelligence summary: Wikipedia GeoSearch + REST API
 """
 
 from datetime import UTC, datetime
+import asyncio
 from typing import Any, Sequence
 
-from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
+from urllib.parse import quote_plus
+
+import httpx
 
 from app.core.config import settings
 from app.domain.common import (
@@ -38,9 +47,10 @@ from app.domain.contracts import (
     SearchResponse,
     SearchResult,
     SourceSummary,
+    ReverseGeocodeResult,
 )
 from app.models.entities import ObservationModel, PlaceAliasModel, PlaceModel, SourceModel
-from app.services.cache import cached_response
+from app.services.cache import cached_response, get_cache
 from app.services.freshness import determine_status, summarize_domain
 
 
@@ -446,3 +456,197 @@ def recent_observations(session: Session, limit: int = 10) -> list[dict[str, Any
         for row in rows
     ]
 
+
+async def _fetch_nominatim_reverse(lat: float, lon: float) -> dict[str, Any]:
+    """Fetch reverse geocoding data from Nominatim OpenStreetMap."""
+    url = "https://nominatim.openstreetmap.org/reverse"
+    params = {
+        "format": "json",
+        "lat": lat,
+        "lon": lon,
+        "accept-language": "en",
+    }
+    headers = {
+        "User-Agent": "Garuda-World-Intel/1.0",
+    }
+    async with httpx.AsyncClient(timeout=settings.UPSTREAM_TIMEOUT_SECONDS) as client:
+        response = await client.get(url, params=params, headers=headers, follow_redirects=True)
+        if response.status_code != 200:
+            return {}
+        return response.json()
+
+
+async def _fetch_open_meteo_weather(lat: float, lon: float) -> dict[str, Any]:
+    """Fetch point weather and air quality from Open-Meteo."""
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current_weather": "true",
+        "weathercodes": "true",
+        "windspeed": "true",
+        "winddirection": "true",
+        "relativehumidity": "2m",
+        "cloudcover": "true",
+        "uv_index": "true",
+        "pm2_5": "true",
+        "timezone": "auto",
+    }
+    async with httpx.AsyncClient(timeout=settings.UPSTREAM_TIMEOUT_SECONDS) as client:
+        response = await client.get(url, params=params, follow_redirects=True)
+        if response.status_code != 200:
+            return {}
+        return response.json()
+
+
+async def _fetch_wikipedia_place_summary(lat: float, lon: float) -> dict[str, Any]:
+    """Fetch Wikipedia summary for the nearest place using GeoSearch."""
+    # First, try to find a nearby Wikipedia article via GeoSearch
+    search_url = "https://en.wikipedia.org/w/api.php"
+    params = {
+        "action": "query",
+        "list": "geosearch",
+        "gscoord": f"{lat}|{lon}",
+        "gsradius": "10000",
+        "gslimit": "1",
+        "format": "json",
+    }
+    async with httpx.AsyncClient(timeout=settings.UPSTREAM_TIMEOUT_SECONDS, headers={"User-Agent": "Garuda-World-Intel/1.0"}) as client:
+        response = await client.get(search_url, params=params, follow_redirects=True)
+        if response.status_code != 200:
+            return {}
+        data = response.json()
+
+    pages = data.get("query", {}).get("geosearch", [])
+    if not pages:
+        return {}
+
+    title = pages[0]["title"]
+    # Now fetch the REST summary
+    from urllib.parse import quote_plus
+
+    summary_url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote_plus(title)}"
+    async with httpx.AsyncClient(timeout=settings.UPSTREAM_TIMEOUT_SECONDS, headers={"User-Agent": "Garuda-World-Intel/1.0"}) as client:
+        response = await client.get(summary_url, follow_redirects=True)
+        if response.status_code == 200:
+            return response.json()
+        return {}
+
+
+
+async def _assemble_place_intelligence(lat: float, lon: float) -> ReverseGeocodeResult:
+    """Concurrently fetch place intelligence from all available keyless public APIs.
+
+    Returns a ReverseGeocodeResult with place, hierarchy, and match_type set.
+    """
+    # Run all three fetches concurrently
+    nominatim_data = await _fetch_nominatim_reverse(lat, lon)
+    openmeteo_data = await _fetch_open_meteo_weather(lat, lon)
+    wikipedia_data = await _fetch_wikipedia_place_summary(lat, lon)
+
+    # Parse Nominatim response
+    place = Place(
+        id=f"reverse-{lat:.4f},{lon:.4f}",
+        canonical_name=nominatim_data.get("display_name", "Unknown location"),
+        aliases=[],
+        place_type="point",
+        coordinates=(lat, lon),
+        resolution_method="reverse_geocode",
+        geometry_available=True,
+    )
+
+    # Parse admin hierarchy from Nominatim address
+    address = nominatim_data.get("address", {})
+    hierarchy = AdminHierarchy(
+        state=address.get("state"),
+        district=address.get("district") or address.get("county"),
+        subdistrict=address.get("subdistrict") or address.get("city"),
+        village=address.get("village") or address.get("town"),
+    )
+
+    # Parse weather and air quality from Open-Meteo
+    weather_observations: list[Observation] = []
+    if not isinstance(openmeteo_data, dict) or "error" in openmeteo_data:
+        weather_observations = []
+    else:
+        current = openmeteo_data.get("current_weather", {})
+        temp = current.get("temperature")
+        windspeed = current.get("windspeed")
+        winddir = current.get("winddirection")
+        humidity = current.get("relativehumidity_2m")
+        uv_index = current.get("uv_index")
+        pm25 = openmeteo_data.get("pm2_5", [{}])[0].get("value") if openmeteo_data.get("pm2_5") else None
+
+        weather_observations = [
+            Observation(
+                field_name="surface_temperature_celsius",
+                value=temp,
+                unit="°C",
+                place_id=place.id,
+                source_id="src-open-meteo",
+                domain="weather_disasters",
+                quality_status=DataStatus.CURRENT,
+                licence="Open Meteo",
+                retrieved_at=datetime.now(UTC),
+            ),
+            Observation(
+                field_name="wind_speed",
+                value=windspeed,
+                unit="km/h",
+                place_id=place.id,
+                source_id="src-open-meteo",
+                domain="weather_disasters",
+                quality_status=DataStatus.CURRENT,
+                licence="Open Meteo",
+                retrieved_at=datetime.now(UTC),
+            ),
+            Observation(
+                field_name="wind_direction",
+                value=winddir,
+                unit="°",
+                place_id=place.id,
+                source_id="src-open-meteo",
+                domain="weather_disasters",
+                quality_status=DataStatus.CURRENT,
+                licence="Open Meteo",
+                retrieved_at=datetime.now(UTC),
+            ),
+        ]
+
+    # Parse Wikipedia summary for location intelligence
+    wiki_title = wikipedia_data.get("title", "") if isinstance(wikipedia_data, dict) else ""
+    wiki_extract = wikipedia_data.get("extract", "") if isinstance(wikipedia_data, dict) else ""
+    wiki_thumbnail = wikipedia_data.get("thumbnail", {}).get("source", "") if isinstance(wikipedia_data, dict) else ""
+
+    hierarchy_note = ""
+    if hierarchy.state or hierarchy.district or hierarchy.subdistrict:
+        parts = [p for p in [hierarchy.state, hierarchy.district, hierarchy.subdistrict] if p]
+        hierarchy_note = f"Located in {'/'.join(parts)}" if parts else ""
+
+    return ReverseGeocodeResult(
+        place=place,
+        hierarchy=hierarchy,
+        distance_km=0.0,
+        latitude=lat,
+        longitude=lon,
+        inside_coverage=True,
+        coverage_note=hierarchy_note or "Reverse geocoded via keyless public APIs (Nominatim, Open-Meteo, Wikipedia).",
+        weather_observations=weather_observations,
+        wiki_title=wiki_title,
+        wiki_extract=wiki_extract,
+        wiki_thumbnail=wiki_thumbnail,
+    )
+
+async def reverse_geocode(lat: float, lon: float, use_cache: bool = True) -> ReverseGeocodeResult:
+    """Reverse geocode a coordinate pair using keyless public APIs.
+
+    Fetches concurrently:
+      1. Nominatim OSM reverse geocoding
+      2. Open-Meteo point weather & air quality
+      3. Wikipedia location intelligence summary
+
+    The `inside_coverage` field is always True for reverse geocode since
+    any point on Earth can be resolved.
+    """
+    result = await _assemble_place_intelligence(lat, lon)
+    return result

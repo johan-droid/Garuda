@@ -1,37 +1,73 @@
 #!/usr/bin/env bash
-# Garuda — project startup script (local development)
+# Garuda — project startup script (local development & Vercel dev)
 # Usage: bash start.sh
-# Starts backend (uvicorn :8000) + frontend (Vite :5173) in one terminal.
-# Ctrl-C stops both.
+# 
+# Modes:
+#   - Local development: starts uvicorn + Vite dev server (original behavior)
+#   - Vercel dev: prepares environment for Vercel serverless deployment
+#
+# License: MIT
 
 set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$REPO_DIR/backend"
 FRONTEND_DIR="$REPO_DIR/frontend"
-VENV_DIR="$BACKEND_DIR/.venv"
 LOG_DIR="$REPO_DIR/.logs"
 
 mkdir -p "$LOG_DIR"
 
 echo "==> Garuda startup"
 echo "   Repo:   $REPO_DIR"
-echo "   Backend: $BACKEND_DIR (uvicorn :8000)"
-echo "   Frontend: $FRONTEND_DIR (Vite :5173)"
+echo "   Backend: $BACKEND_DIR"
+echo "   Frontend: $FRONTEND_DIR"
 
-# ---- Python environment ----
-if [ ! -d "$VENV_DIR" ]; then
-  echo "==> Creating Python venv at $VENV_DIR"
-  python3 -m venv "$VENV_DIR"
+# Detect mode: check for VERCEL environment variable
+if [ "${VERCEL:-}" = "1" ] || [ "${1:-local}" = "vercel" ]; then
+  echo ""
+  echo "==> Vercel serverless mode"
+  echo "   Starting vercel dev server..."
+  echo "   Run: vercel dev --localhost-only"
+  echo ""
+  echo "==> Local environment setup"
+  
+  # Install Python dependencies
+  echo "==> Installing Python dependencies (with --break-system-packages for Python 3.12+)"
+  pip install --upgrade pip --break-system-packages -q 2>&1 | tail -1
+  pip install -e "$BACKEND_DIR" --break-system-packages -q 2>&1 | tail -1
+  
+  # Install Node dependencies
+  echo "==> Installing Node dependencies"
+  cd "$FRONTEND_DIR"
+  npm install --no-audit --no-fund -q 2>&1 | tail -3
+  
+  # Check for PostgreSQL configuration
+  if [ -z "${DATABASE_URL:-}" ]; then
+    echo "==> ⚠️  DATABASE_URL not set"
+    echo "   For Vercel serverless, you need a PostgreSQL database (Neon, Supabase, Railway, etc.)"
+    echo "   Set DATABASE_URL environment variable to your PG connection string"
+  else
+    echo "==> PostgreSQL database configured: ${DATABASE_URL:0:20}..."
+  fi
+  
+  echo ""
+  echo "==> To deploy to Vercel:"
+  echo "   vercel login"
+  echo "   vercel --prod"
+  echo ""
+  echo "==> Development mode:"
+  echo "   vercel dev"
+  exit 0
 fi
 
-# shellcheck disable=SC1091
-source "$VENV_DIR/bin/activate"
+# ---- Original local development mode ----
 
-echo "==> Installing Python dependencies"
-pip install --upgrade pip -q
-pip install -e "$BACKEND_DIR" -q
+# ---- Python environment ----
+echo "==> Installing Python dependencies (with --break-system-packages for Python 3.12+)"
+pip install --upgrade pip --break-system-packages -q 2>&1 | tail -1
+pip install -e "$BACKEND_DIR" --break-system-packages -q 2>&1 | tail -1
 
+# ---- Node environment ----
 echo "==> Installing Node dependencies"
 cd "$FRONTEND_DIR"
 npm install --no-audit --no-fund -q 2>&1 | tail -3
@@ -39,10 +75,10 @@ npm install --no-audit --no-fund -q 2>&1 | tail -3
 # ---- Database ----
 cd "$BACKEND_DIR"
 echo "==> Initializing database schema"
-PYTHONPATH=backend python3 -m app.db.init_db
+PYTHONPATH=backend python3 -m app.db.init_db 2>&1 | tail -3
 
 echo "==> Seeding pilot data (idempotent)"
-python3 backend/seed_pilot.py 2>&1 | tail -3 || echo "   (seed skipped or already current)"
+python3 seed_pilot.py 2>&1 | tail -3 || echo "   (seed skipped or already current)"
 
 # ---- Free ports ----
 echo "==> Freeing ports 8000 and 5173"

@@ -20,7 +20,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Sentinel used to detect "not configured". Deliberately not a usable secret.
 _UNSET = "unset"
 
-# Default SQLite database path anchored to the project root directory
+# Default database configuration
+# - SQLite: for local development (zero-cost, ephemeral)
+# - PostgreSQL: required for production and Vercel serverless deployment
+_DEFAULT_SQLITE_PATH = (Path(__file__).resolve().parents[3] / "garuda_local.db").resolve()
+
+# PostgreSQL connection pool settings for serverless
+# Vercel serverless functions have short lifetimes, so we use tiny pools
+_PG_POOL_SIZE = 2
+_PG_MAX_OVERFLOW = 0
+_PG_TIMEOUT = 15
+_PG_POOL_RECYCLE = 300  # 30 minutes - shorter than SQLite default
 # (garuda/backend/app/core/config.py -> parents[3] == garuda/)
 _DEFAULT_SQLITE_PATH = (Path(__file__).resolve().parents[3] / "garuda_local.db").resolve()
 
@@ -71,7 +81,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(
         default=f"sqlite:///{_DEFAULT_SQLITE_PATH}",
         validation_alias=AliasChoices("DATABASE_URL", "GARUDA_DATABASE_URL"),
-        description="Database connection URL. SQLite for zero-cost dev/testing, PostgreSQL for production",
+        description=(
+            "Database connection URL. "
+            "SQLite for zero-cost dev/testing (ephemeral - not for production). "
+            "PostgreSQL (e.g. postgresql://user:pass@host:port/db) for production/serverless."
+        ),
     )
     DB_POOL_SIZE: int = Field(default=5, description="Connection pool size")
     DB_MAX_OVERFLOW: int = Field(default=10, description="Max overflow connections")
@@ -271,6 +285,15 @@ class Settings(BaseSettings):
     @property
     def is_sqlite(self) -> bool:
         return self.DATABASE_URL.startswith("sqlite")
+
+    @property
+    def is_postgresql(self) -> bool:
+        return self.DATABASE_URL.startswith("postgresql")
+
+    @property
+    def is_serverless_suitable(self) -> bool:
+        """Check if the current config is suitable for serverless deployment."""
+        return self.is_postgresql and not self.is_sqlite
 
 
 @lru_cache(maxsize=1)
